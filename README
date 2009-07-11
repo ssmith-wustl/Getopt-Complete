@@ -1,0 +1,105 @@
+NAME
+    Getopt::Complete - add bash autocompletion to Perl applications
+
+SYNOPSIS
+    In the Perl program "myprogram"
+
+        use Getopt::Complete '--frog' => ['ribbit','urp','ugh'], '--fraggle'
+        => sub { return ['rock','roll'] }, '--person' =>
+        \&Getopt::Complete::users, '--output' => \&Getopt::Complete::files,
+        '--exec' => \&Getopt::Complete::commands, '' =>
+        \&Getopt::Complete::environment, ;
+
+    Next we tell the shell that it can get auto-completion for "myprogram"
+    by runing myprogram with a special environment variable set.
+
+    This line goes in the user's .bashrc, .bash_profile or system
+    /etc/bashrc or /etc/bash_profile:
+
+        complete -C 'GETOPT_COMPLETION=bash myprogram' myprogram
+
+    Note: the syntax is intended to support multiple shells, but currently
+    bash is the only supported value.
+
+DESCRIPTION
+    The bash shell supports smart completion of words when the TAB key is
+    pressed.
+
+    By default, bash will presume the word the user is typing is a file
+    name, and will attempt to complete the word accordingly. Bash can,
+    however, be told to run a specific program to handle the completion
+    task.
+
+    This module allows a program to be its own word-completer.
+
+    The "use" statement for the module takes a list of key-value pairs to
+    control the process. The format is described below.
+
+KEYS
+    Each key in the list decribes an option which can be completed.
+
+    plain text
+        A normal word is interpreted as an option name. Dashes are optinal.
+        Getopt-style suffixes are ignored as well.
+
+    a blank string ('')
+        A blank key specifiies how to complete non-option (bare) arguments.
+
+VALUES
+    Each value describes how that option should be completed.
+
+    array reference
+        An array reference expliciitly lists the valid values for the
+        option.
+
+    undef
+        An undefined value indicates that the option has no following value
+        (for boolean flags)
+
+    subroutine reference
+        This will be called, and expected to return an array of possiible
+        matches.
+
+    plain text
+        A text string will be presumed to be a subroutine name, which will
+        be called as above.
+
+    There is a built-in subroutine which provides access to compgen, the
+    bash built-in which does completion on file names, command names, users,
+    groups, services, and more.
+
+    See USING BUILTIN COMPLETIONS below.
+
+USING SUBROUTINE CALLBACKS
+    A subroutine callback will always receieve two arguments:
+
+    current word
+        This is the word the user is trying to complete. It may be an empty
+        string, if the user hits <Tab> without typiing anything first.
+
+    previous option
+        This is the option argument to the left of the word the user is
+        typing. If the word to the left is not an option argument, or there
+        is no word to the left besidies the command itself, this will be an
+        empty string.
+
+    The return value is a list of possible matches. The callback is free to
+    narrow its results by examining the current word, but is not required to
+    do so. The module will always return only the appropriate matches.
+
+USING BUILTIN COMPLETIONS
+    Any of the default shell completions supported by bash's compgen are
+    supported by this module. The full name is alissed as the
+    single-character compgen parameter name for convenience.
+
+    See "man bash", in the Programmable Complete secion for more details.
+
+BUGS
+    Currently only supports bash, though other shells could be added easily.
+
+    Imperfect handling of cases where the value in a key-value starts with a
+    dash.
+
+AUTHOR
+    Scott Smith <scottsmithus yahoo>
+

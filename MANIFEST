@@ -1,0 +1,12 @@
+Changes
+MANIFEST
+Makefile.PL
+README
+lib/Getopt/Complete.pm
+t/00-load.t
+t/boilerplate.t
+t/exercise.t
+t/myprogram
+t/pod-coverage.t
+t/pod.t
+update-distfiles.sh
