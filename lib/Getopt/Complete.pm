@@ -7,14 +7,35 @@ package Getopt::Complete;
 use version;
 our $VERSION = qv(0.02);
 
+use Getopt::Long;
+
 our %handlers;
+
+our @OPT_SPEC;
+our $OPTS_OK;
+our %OPTS;
 
 sub import {    
     my $class = shift;
     %handlers = (@_);
 
-    for my $key (sort keys %handlers) {
-        unless ($key eq '' or $key =~ /^--/) {
+    for my $text (sort keys %handlers) {
+        next if $text eq '';
+        my ($dashes,$key,$spec) = ($text =~ /^(\-*)(\w+)(.*)/);
+        if (not defined $key) {
+            print STDERR __PACKAGE__ . " is unable to parse $text! from spec!";
+            next;
+        }
+        unless ($spec) {
+            if (defined($handlers{$text})) {
+                $spec = '=s';
+            }
+            else {
+                $spec = '!';
+            }
+        }
+        push @OPT_SPEC, $key . $spec;
+        unless ($key eq '' or $dashes eq '--') {
             my $new_key = '--' . $key;
             $handlers{$new_key} = delete $handlers{$key};
             $key = $new_key;
@@ -37,6 +58,10 @@ sub import {
         my @other_options = split(/\s+/,$left);
         my $command = $other_options[0];
         my $previous = pop @other_options if $other_options[-1] =~ /^-/;
+        @ARGV = @other_options;
+        $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
+        @Getopt::Complete::ERRORS = invalid_options();
+        $Getopt::Complete::OPTS_OK = 0 if $Getopt::Complete::ERRORS;
         Getopt::Complete::print_matches_and_exit($command,$current,$previous,\@other_options);
     }
     elsif (my $shell = $ENV{GETOPT_COMPLETE}) {
@@ -55,9 +80,62 @@ sub import {
     }
     else {
         # Normal execution of the program (or else an error in use of "complete" to tell bash about this program.)
+        do {
+            my @orig_argv = @ARGV;
+            local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
+            $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
+            if (@ARGV) {
+                my $a = $Getopt::Complete::OPTS{'<>'} ||= [];
+                push @$a, @ARGV;
+            }
+            @ARGV = @orig_argv;
+        };
+        if (my @more_errors = invalid_options()) {
+            warn "value errors " . scalar(@more_errors);
+            $Getopt::Complete::OPTS_OK = 0;
+            push @Getopt::Completion::ERRORS, @more_errors;
+        }
     }
 }
 
+sub invalid_options {
+    my @failed;
+    for my $key (sort keys %handlers) {
+        my $completions = $handlers{$key};
+        
+        my @values;
+        next if ($key eq '');
+        my ($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
+        if (not defined $name) {
+            print STDERR "key $key is unparsable in source of ! $0";
+            next;
+        }
+        @values = $OPTS{$name};
+        for my $value (@values) {
+            next if not defined $value;
+            if (ref($completions) eq 'CODE') {
+                $completions = $completions->($value,$key);
+                $completions = [] if not defined $completions;
+            }
+            if (not defined $completions) {
+                next;
+            }
+            elsif (ref($completions) eq 'ARRAY') {
+                unless (grep { $_ eq $value } @$completions) {
+                    my $msg = (($key || 'arguments') . " have invalid value $value");
+                    push @failed, $msg;
+                    last;
+                }
+            }
+            elsif ($value ne $completions) {
+                my $msg = (($key || 'arguments') . " have invalid value $value");
+                push @failed, $msg;
+                last;
+            }
+        }
+    }
+    return @failed;
+}
 
 sub print_matches_and_exit {
     my ($command, $current, $previous, $all) = @_;
@@ -240,22 +318,24 @@ In the Perl program "myprogram":
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
-  complete -C 'GETOPT_COMPLETE=bash myprogram1' myprogram1
-  complete -C 'GETOPT_COMPLETE=bash myprogram2' myprogram2
-  ...
+  complete -C 'GETOPT_COMPLETE=bash myprogram1' myprogram
+  
+Thereafter in the terminal (after next login, or sourcing the .bashrc):
 
+  $ myprogram --f<TAB>
+  $ myprogram --fr
 
-When the user types:
-  myprogram --f<TAB>
-
-The shell will add an "r", and will then present the options:
+  $ myprogram --fr<TAB><TAB>
   frog fraggle
 
-When they type "o"<TAB>, it will complete the word --frog, and
-offer the following options:
+  $ myprogram --fro<TAB>
+  $ myprogram --frog 
+
+  $ myprogram --frog <TAB>
   ribbit urp ugh
 
-When they type "r"<TAB>, it will complete the word "ribbit".
+  $ myprogram --frog r<TAB>
+  $ myprogram --frog ribbit
 
 =head1 DESCRIPTION
 
@@ -263,8 +343,8 @@ Perl applications using the Getopt::Complete module can "self serve"
 as their own shell-completion utility.
 
 When "use Getopt::Complete" is encountered at compile time, the application
-will detect that it is being run by bash to do shell completion, and
-will respond to bash instead of running the app.
+will detect that it is being run by bash (or bash-compatible shell) to do 
+shell completion, and will respond to bash instead of running the app.
 
 When running the program in "completion mode", bash will comminicate
 the state of the command-line using environment variables and command-line
@@ -356,6 +436,23 @@ will be an empty string.
 
 =back
 
+In cases where bash launches the app with the -F option, two additional values 
+are available.  See below (COMPLETIONS WHICH REQUIRE EXAMINING THE ENTIRE COMMAND LINE)
+for details:
+
+=over 4
+
+=item argv 
+
+An arrayref containing all of @ARGV _except_ the key/value pair being resolved.
+This is useful when one option's value controls what values are valid for other options.
+
+=item opts
+
+A hashref made from processing the above incomplete ARGV. 
+
+=back
+
 The return value is a list of possible matches.  The callback is free to narrow its results
 by examining the current word, but is not required to do so.  The module will always return
 only the appropriate matches.
@@ -367,34 +464,43 @@ The full name is alissed as the single-character compgen parameter name for conv
 
 See "man bash", in the Programmable Complete secion for more details.
 
-=head1 SEEING THE WHOLE COMMAND LINE IN CALLBACKS
+=head1 COMPLETIONS WHICH REQUIRE EXAMINING THE ENTIRE COMMAND LINE 
 
-Sometimes, the completions for one option will vary depending on what else is on the 
-command-line.  If the "complete" command is given a shell function, that function
-will have access to more information about the commmand line, and will pass those
-values through to the Perl application.
+In some cases, the options which should be available change depending on what other
+options are present, or the values available change depending on other options or their
+values.
 
-This function should be present in the .bashrc or .bash_profile:
+The standard "complete -C" does not supply the entire command-line to the completion
+program, unfortunately.  Getopt::Complete, as of version v0.02, now recognizes when
+bash is configured to call it with "complete -F".  Using this involves adding a
+few more lines of code to your .bashrc or .bash_profile:
 
   _getopt_complete() {
       export COMP_LINE COMP_POINT;
       COMPREPLY=( $( ${COMP_WORDS[0]} ) )
   }
 
-The "complete" command to use to get extra features on the Perl side is:
+The "complete" command then can look like this in the .bashrc/.bash_profile: 
 
-  complete -F _getopt_complete myprogram1
-  complete -F _getopt_complete myprogram2
-  ...
+  complete -F _getopt_complete myprogram
 
 This has the same effect as the simple "complete -C" entry point, except that
-the remaining @ARGV is passed as an arrayref to any subroutine callbacks.
+all callbacks which are subroutines will received two additional parameters:
+1. the remaining parameters as an arrayref
+2. the above already processed through GetOpt::Long into a hashref.
 
-  sub {
-    my ($incomplete_word, $field_name_to_the_left_if_applicable, $remaining_argv_oh_goody) = @_;
-    ...
-    return \@completions; 
-  }
+
+  use Getopt::Complete
+    type => ['names','places'],
+    instance => sub {
+            my ($value, $key, $argv, $opts) = @_;
+            if ($opts{type} eq 'names') {
+                return [qw/larry moe curly/],
+            }
+            elsif ($opts{type} eq 'places') {
+                return [qw/here there everywhere/],
+            }
+        }
 
 =head1 BUGS
 
