@@ -1,0 +1,63 @@
+#!/usr/bin/env perl
+use strict;
+use Data::Dumper;
+
+require Getopt::Complete;
+
+Getopt::Complete->import(
+        # list the explicit values which are valid for this option
+        'frog'    => ['ribbit','urp','ugh'],
+
+        # you can add any valid Getopt::Long specification to the key
+        # if you put nothing: "=s" is assumed
+        'names=s@' => ['eenie','meanie','miney'],
+
+        # undef means we don't know how to complete the value: any value specified will do
+        # this will result in no shell ompletions, but will still expect a value to be entered
+        # unless it is boolean
+        'name=s'  => undef,
+
+        # boolean values never have a completion list, and will yell if you are that foolish
+        'yes!'    => undef,
+
+        # handle unnamed arguments from the command-line ("non-option" arguments) with a spcial key:
+        # you can control completions on these too...
+        '<>'      => $Getopt::Complete::files,
+
+        # CODE callbacks allow a the completion list to be dynamically resolved 
+        'fraggle' => sub { return ['rock','roll'] },
+
+        # support for Bash "compgen" builtins is present with some pre-made callbacks
+        'myfile'    => \&Getopt::Complete::files,
+        'mydir'     => \&Getopt::Complete::directories,
+        
+        # callbacks get extra info to help them, including the part of the
+        # word already typed, and the remainder of the options already processed for context
+        'type'    => ['people','places'],
+        'instance'=> sub {
+                            my ($command, $value, $key, $other_opts) = @_;
+                            if (my $type = $other_opts->{type}) {
+                                if ($type eq 'people') {
+                                    return [qw/larry moe curly/]
+                                }
+                                elsif ($type eq 'places') {
+                                    return [qw/here there everywhere/],
+                                }
+                            }
+                            return [];
+                        },
+
+        # don't do this.  it means that a required parameter has no values which are good enough
+        # better to just delete the program
+        'ujustcantwin' => [],
+);
+
+print "RUNNING WITH handlers, OPTS, SPEC, ARGV,:\n" . Dumper(
+    \%Getopt::Complete::handlers,
+    \%Getopt::Complete::OPTS, 
+    \@Getopt::Complete::OPT_SPEC,
+    \@ARGV
+);
+print "OPTS OK?: " . $Getopt::Complete::OPTS_OK . "\n";
+warn "errors:\n" . join("\n\t",@Getopt::Complete::ERRORS) . "\n";
+1;
