@@ -17,29 +17,25 @@ our %OPTS;
 
 sub import {    
     my $class = shift;
+    
+    # parse out the options spec at the end of each key, if present
+    # prepare the specification for GetOptions
+    # normalize...
     %handlers = (@_);
-
-    for my $text (sort keys %handlers) {
-        next if $text eq '';
-        my ($dashes,$key,$spec) = ($text =~ /^(\-*)(\w+)(.*)/);
-        if (not defined $key) {
-            print STDERR __PACKAGE__ . " is unable to parse $text! from spec!";
+    my $bare_args = 0;
+    for my $key (sort keys %handlers) {
+        my ($name,$spec) = ($key =~ /^([\w|\-]\w+|\<\>)(.*)/);
+        if (not defined $name) {
+            print STDERR __PACKAGE__ . " is unable to parse $key! from spec!";
             next;
         }
-        unless ($spec) {
-            if (defined($handlers{$text})) {
-                $spec = '=s';
-            }
-            else {
-                $spec = '!';
-            }
+        $handlers{$name} = delete $handlers{$key};
+        if ($name eq '<>') {
+            $bare_args = 1;
+            next;
         }
-        push @OPT_SPEC, $key . $spec;
-        unless ($key eq '' or $dashes eq '--') {
-            my $new_key = '--' . $key;
-            $handlers{$new_key} = delete $handlers{$key};
-            $key = $new_key;
-        }
+        $spec ||= '=s';
+        push @OPT_SPEC, $name . $spec;
     }
 
     if ($ENV{COMP_LINE}) {
@@ -57,7 +53,7 @@ sub import {
 
         my @other_options = split(/\s+/,$left);
         my $command = $other_options[0];
-        my $previous = pop @other_options if $other_options[-1] =~ /^-/;
+        my $previous = pop @other_options if $other_options[-1] =~ /^--/;
         @ARGV = @other_options;
         $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
         @Getopt::Complete::ERRORS = invalid_options();
@@ -85,15 +81,26 @@ sub import {
             local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
             $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
             if (@ARGV) {
-                my $a = $Getopt::Complete::OPTS{'<>'} ||= [];
-                push @$a, @ARGV;
+                if ($bare_args) {
+                    my $a = $Getopt::Complete::OPTS{'<>'} ||= [];
+                    push @$a, @ARGV;
+                }
+                else {
+                    print STDERR "xa @ARGV\n";
+                    $Getopt::Complete::OPTS_OK = 0;
+                    for my $arg (@ARGV) {
+                        push @Getopt::Complete::ERRORS, "unexpected unnamed arguments: $arg";
+                    }
+                }
             }
             @ARGV = @orig_argv;
         };
         if (my @more_errors = invalid_options()) {
-            warn "value errors " . scalar(@more_errors);
+            #warn "value errors " . scalar(@more_errors);
+            #use Data::Dumper;
+            #print STDERR Dumper(\@more_errors);
             $Getopt::Complete::OPTS_OK = 0;
-            push @Getopt::Completion::ERRORS, @more_errors;
+            push @Getopt::Complete::ERRORS, @more_errors;
         }
     }
 }
@@ -103,14 +110,14 @@ sub invalid_options {
     for my $key (sort keys %handlers) {
         my $completions = $handlers{$key};
         
-        my @values;
-        next if ($key eq '');
+        next if ($key eq '<>');
         my ($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
         if (not defined $name) {
-            print STDERR "key $key is unparsable in source of ! $0";
+            print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
             next;
         }
-        @values = $OPTS{$name};
+
+        my @values = (ref($OPTS{$name}) ? @{ $OPTS{$name} } : $OPTS{$name});
         for my $value (@values) {
             next if not defined $value;
             if (ref($completions) eq 'CODE') {
@@ -122,13 +129,12 @@ sub invalid_options {
             }
             elsif (ref($completions) eq 'ARRAY') {
                 unless (grep { $_ eq $value } @$completions) {
-                    my $msg = (($key || 'arguments') . " have invalid value $value");
+                    my $msg = (($key || 'arguments') . " has invalid value $value");
                     push @failed, $msg;
-                    last;
                 }
             }
             elsif ($value ne $completions) {
-                my $msg = (($key || 'arguments') . " have invalid value $value");
+                my $msg = (($key || 'arguments') . " has invalid value $value");
                 push @failed, $msg;
                 last;
             }
@@ -144,27 +150,40 @@ sub print_matches_and_exit {
     #print "11 22 33\n";
     #exit;
  
-    my @args = map { /^-+(.*)/ ? ($1) : () } keys %handlers;
-    
+    my @args = keys %handlers;
     my @possibilities;
-    if ($current =~ /^(-+)/ and not length($previous)) {
-        # a new option argment (starts with '-')
-        @possibilities = map { '--' . $_ } @args;
-    }
-    elsif (my $handler = $handlers{$previous}) {
-        # a value for the key just before it
-        # or a bare, non-option argument
-        if (defined($handler) and not ref($handler) eq 'ARRAY') {
-            $handler = $handler->($command,$current,$previous,$all);
+
+    my ($dashes,$resolve_values_for_option_name) = ($previous =~ /^(--)(.*)/); 
+    
+    if (not length $previous) {
+        # an unqalified argument, or an option name
+        if ($current =~ /^(-+)/) {
+            # the incomplete word is an option name
+            @possibilities = map { '--' . $_ } grep { $_ ne '<>' } @args;
         }
-        unless (ref($handler) eq 'ARRAY') {
-            die "values for $previous must be an arrayref! got $handler\n";
+        else {
+            # bare argument
+            $resolve_values_for_option_name = '<>';
         }
-        @possibilities = @$handler;
     }
-    else {
-        # no possibilities
-        @possibilities = ();
+
+    if ($resolve_values_for_option_name) {
+        # either a value for a named option, or a bare argument.
+        if (my $handler = $handlers{$resolve_values_for_option_name}) {
+            # the incomplete word is a value for some option (possible the option '<>' for bare args)
+            if (defined($handler) and not ref($handler) eq 'ARRAY') {
+                $handler = $handler->($command,$current,$previous,$all);
+            }
+            unless (ref($handler) eq 'ARRAY') {
+                die "values for $previous must be an arrayref! got $handler\n";
+            }
+            @possibilities = @$handler;
+        }
+        else {
+            # no possibilities
+            # print STDERR "recvd: " . join(',',@_) . "\n";
+            @possibilities = ();
+        }
     }
 
     my @matches; 
