@@ -119,8 +119,10 @@ sub import {
         # Normal execution of the program.
         # Process the command-line options and store the results.  
         my @orig_argv = @ARGV;
-        local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
-        $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
+        do {
+            local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
+            $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
+        };
         if (@ARGV) {
             if ($bare_args) {
                 my $a = $Getopt::Complete::OPTS{'<>'} ||= [];
@@ -136,6 +138,13 @@ sub import {
         if (my @more_errors = invalid_options()) {
             $Getopt::Complete::OPTS_OK = 0;
             push @Getopt::Complete::ERRORS, @more_errors;
+        }
+        if (@ERRORS) {
+            for my $error (@ERRORS) {
+                chomp $error;
+                warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+            }
+            exit 1;
         }
         # RESTORE ARGV!  In case the developer doesn't want to use our processed options...
         @ARGV = @orig_argv;
@@ -525,24 +534,38 @@ The completion features currently work with the bash shell, which is
 the default on most Linux and Mac systems.  Patches for other shells 
 are welcome.  
 
+For more information go to:
+ 
+ http://github.com/sakoht/Getopt--Complete-for-Perl/
+
 =head1 OPTIONS PROCESSING
 
-The %OPTS hash contains all processed command-line arguments,
-during normal execution of the program.   During shell-completion,
-it contains everything EXCEPT the current option being resolved,
-which is passed-into callbacks as separate fields.
+Getopt::Complete processes the command-line options at compile time.
+
+The results are avaialble in an %OPTS hash:
+
+  use Getopt::Complete (
+    'mydir'     => 'd',
+    'myfile'    => 'f',
+    '<>'        =  ['monkey', 'taco', 'banana']
+  );
+
+  for $opt (keys %OPTS) {
+    $val = $OPTS{$opt};
+    print "$opt has value $val\n";
+  }
 
 Errors in shell argumentes result in messages to STDERR via warn(), and cause the 
-program to exit by default.  Getopt::Complete verifies that the option values specified
-match their own completion list, and will otherwise add additional fatal errors. 
+program to exit during "use".  Getopt::Complete verifies that the option values specified
+match their own completion list, and will otherwise add additional errors
+explaining the problem.
 
-Getopt::Complete processes all command-line options at compile time.
-%Getopt::Complete::OPTS is given an alias in packages which use
-Getopt::Complete.
+The %OPTS hash is an alias for %Getopt::Complete::OPTS.  The alias is not created 
+in the caller's namespaces if a hash named %OPTS already exists with data.
 
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
-See OVERRIDING PROCESSIND DEFAULTS below for details.
+See OVERRIDING PROCESSING DEFAULTS below for details.
 
 =head1 PROGRAMMABLE COMPLETION BACKGROUND
 
@@ -617,7 +640,7 @@ key usable in a Getopt:::Long GetOptions specification works here,
 
 =over 4
 
-=item option name
+=item an option name
 
 A normal word is interpreted as an option name. The '=s' specifier is
 presumed if no specifier is present.
@@ -632,12 +655,21 @@ For example:
   'p1=s' => [...]       # the same as just 'p1'
   'p2=s@' => [...]      # expect multiple values
 
-=item '<>'
+=item the '<>' symbol for "bare arguments"
 
 This special key specifies how to complete non-option (bare) arguments.
 It presumes multiple values are possible (like '=s@'):
 
+Have an explicit list:
  '<>' = ['value1','value2','value3']
+
+Do normal file completion:
+ '<>' = 'files'
+
+Take arbitrary values with no expectations:
+ '<>' = undef
+
+If there is no '<>' key specified, bare arguments will be treated as an error.
 
 =back
 
@@ -698,11 +730,13 @@ it is not, it will be presumed to refer to one of the bash builtin completions t
 See BUILTIN COMPLETION TYPES below.)
 
 The subroutine will be called, and is expected to return an arrayref of possiible matches.  
-The arrayref will be treated as though it were specified directly.
+The arrayref will be treated as though it were specified directly in the specification.
 
 As with explicit values, an empty arrayref indicated that there are no valid matches 
 for this option, given the other params on the command-line, and the text already typed.
 An undef value indicates that any value is valid for this parameter.
+
+Parameters to the callback are described below.
 
 =back
 
@@ -828,7 +862,7 @@ The full name is alissed as the single-character compgen parameter name for conv
 Further, because Getopt::Complete is the default namespace during processing, it can
 be ommitted from callback function names.
 
-These are all equivalent:
+The following are all equivalent.  They effectively produce the same list as 'compgen -f':
 
    file1 => \&Getopt::Complete::files
    file1 => \&Getopt::Complete::f
@@ -836,6 +870,7 @@ These are all equivalent:
    file1 => 'Getopt::Complete::f'
    file1 => 'files'
    file1 => 'f'
+
 
 =head1 UNLISTED VALID VALUES
 
@@ -892,18 +927,17 @@ To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
 =head1 OVERRIDING COMPILE-TIME OPTION PARSING 
 
-Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
-GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
-Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
-
-The %OPTS hash is an alias for %Getopt::Complete::OPTS.  The alias is not created 
-in the caller's namespaces if a hash named %OPTS already exists with data.
+Getopt::Complete makes a lot of assumptions in order to be easy to use in the
+default case.  Here is how to override that behavior if it's not what you want.
 
 To prevent Getopt::Complete from exiting at compile time if there are errors,
 the NO_EXIT_ON_ERRORS flag should be set first, at compile time, before using
 the Getopt::Complete module as follows:
 
  BEGIN { $Getopt:Complete::NO_EXIT_ON_ERRORS = 1; }
+
+This should not affect completions in any way (it will still exit if it realizes
+it is talking to bash, to prevent accidentally running your program).
 
 Errors will be retained in:
  
@@ -914,18 +948,28 @@ independent option processing can be done if necessary.  The full
 spec imported by Getopt::Complete is stored as:
 
  @Getopt::Complete::OPT_SPEC;
- 
-=head1 BUGS
 
-Some uses of Getopt::Long will not work currently: multi-name options, +, :, --no-*, --no*.
+With the flag above, set, you can completely ignore, or partially ignore,
+the options processing which happens automatically.
+
+You can also adjust how option processing happens inside of Getopt::Complete.
+Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
+GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
+Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
+
+ 
+=head1 DEVELOPMENT
+
+  git clone git://github.com/sakoht/Getopt--Complete-for-Perl.git
+
+=head1 BUGS
 
 The logic to "shorten" the completion options shown in some cases is still in development. 
 This means that filename completion shows full paths as options instead of just the basename of the file in question.
 
-=head1 IN DEVELOPMENT
+Some uses of Getopt::Long will not work currently: multi-name options, +, :, --no-*, --no*.
 
 Currently this module only supports bash, though other shells could be added easily.
-Submit a patch!  It's probably very easy.
 
 There is logic in development to have the tool possibly auto-update the user's .bashrc / .bash_profile, but this
 is incomplete.
