@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv(0.03);
+our $VERSION = qv('0.4');
 
 use Getopt::Long;
 
@@ -23,6 +23,7 @@ our $LONE_DASH_SUPPORT = 1;
 sub import {    
     my $class = shift;
 
+    # Install an alias to %Getopt::Complete::OPTS in the caller's namespace
     do {
         no strict 'refs';
         my $pkg = caller();
@@ -37,7 +38,7 @@ sub import {
     my $bare_args = 0;
     my $parse_errors;
     for my $key (sort keys %COMPLETION_HANDLERS) {
-        my ($name,$spec) = ($key =~ /^([\w|-]\w*|\<\>|)(\W.*|)/);
+        my ($name,$spec) = ($key =~ /^([\w|-]+|\<\>|)(\W.*|)/);
         if (not defined $name) {
             print STDERR __PACKAGE__ . " is unable to parse '$key' from spec!";
             $parse_errors++;
@@ -80,10 +81,14 @@ sub import {
             $parse_errors++;
         }
     }
+
+    # If here are errors, we exit now.
     if ($parse_errors) {
         exit 1;
     }
 
+    # Check whether we're "really" running, or have been run by the shell
+    # to do word completion.
     if ($ENV{COMP_LINE}) {
         # This command has been set to autocomplete via "completeF".
         my $left = substr($ENV{COMP_LINE},0,$ENV{COMP_POINT});
@@ -100,7 +105,8 @@ sub import {
         # it's hard to spot the case in which the previous word is "boolean", and has no value specified
         if ($previous) {
             my ($name) = ($previous =~ /^-+(.*)/);
-            if ($OPT_SPEC{$name} =~ /[\!\+]/) {
+            $name =~ s/^no-//;
+            if ($OPT_SPEC{$name} and $OPT_SPEC{$name} =~ /[\!\+]/) {
                 push @other_options, $previous;
                 $previous = undef;
             }
@@ -151,25 +157,38 @@ sub import {
     }
 }
 
-sub print_matches_and_exit {
-    my $class = shift;
-}
-
 sub resolve_possible_completions {
     my ($self,$command, $current, $previous, $all) = @_;
 
     $previous = '' if not defined $previous;
 
-    my @args = keys %COMPLETION_HANDLERS;
     my @possibilities;
 
     my ($dashes,$resolve_values_for_option_name) = ($previous =~ /^(--)(.*)/); 
-   
     if (not length $previous) {
         # an unqalified argument, or an option name
         if ($current =~ /^(-+)/) {
             # the incomplete word is an option name
-            @possibilities = map { length($_) ? ('--' . $_) : ('-') } grep { $_ ne '<>' } @args;
+            my @args = keys %COMPLETION_HANDLERS;
+            
+            # We only show the negative version of boolean options 
+            # when the user already has "--no-" on the line.
+            # Otherwise, we just include --no- as a possible (partial) completion
+            my %boolean = map { $_ => 1 } grep { $OPT_SPEC{$_} =~ /\!/ } @args;
+            my $show_negative_booleans = ($current =~ /^--no-/ ? 1 : 0);
+            @possibilities = 
+                map { length($_) ? ('--' . $_) : ('-') } 
+                map {
+                    ($show_negative_booleans and $boolean{$_} )
+                        ? ($_, 'no-' . $_)
+                        : $_
+                }
+                grep { $_ ne '<>' } @args;
+            if (%boolean and not $show_negative_booleans) {
+                # a partial completion for negating booleans when we're NOT
+                # already showing the complete list
+                push @possibilities, "--no-\t";
+            }
         }
         else {
             # bare argument
@@ -281,7 +300,7 @@ sub invalid_options {
             $spec = '=s@';
         }
         else {
-            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]\w*|\<\>|)(\W.*|)/);
+            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]+|\<\>|)(\W.*|)/);
             #($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
             if (not defined $name) {
                 print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
@@ -534,9 +553,6 @@ The completion features currently work with the bash shell, which is
 the default on most Linux and Mac systems.  Patches for other shells 
 are welcome.  
 
-For more information go to:
- 
- http://github.com/sakoht/Getopt--Complete-for-Perl/
 
 =head1 OPTIONS PROCESSING
 
@@ -957,10 +973,13 @@ Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It use
 GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
 Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
 
- 
 =head1 DEVELOPMENT
 
-  git clone git://github.com/sakoht/Getopt--Complete-for-Perl.git
+Patches are welcome.
+ 
+ http://github.com/sakoht/Getopt--Complete-for-Perl/
+
+ git clone git://github.com/sakoht/Getopt--Complete-for-Perl.git
 
 =head1 BUGS
 
@@ -978,9 +997,23 @@ is incomplete.
 
 L<Getopt::Long> is the definitive options parser, wrapped by this module.
 
-=head1 AUTHOR
+=head1 COPYRIGHT
 
-Scott Smith (sakoht at cpan)
+Copyright 2009 Scott Smith and Washington University School of Medicine
+
+=head1 LICENSE
+
+=head1 AUTHORS
+
+Scott Smith (sakoht at cpan .org)
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+The full text of the license can be found in the LICENSE file included with this
+module.
 
 =cut
 

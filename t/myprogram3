@@ -16,7 +16,8 @@ use Getopt::Complete (
         'name=s'  => undef,
 
         # boolean values never have a completion list, and will yell if you are that foolish
-        'yes!'    => undef,
+        'go!'       => undef,
+        'fast!'      => undef,
 
         # handle unnamed arguments from the command-line ("non-option" arguments) with a spcial key:
         # you can control completions on these too...
@@ -45,8 +46,11 @@ use Getopt::Complete (
                             return [];
                         },
 
+        # we used-to fail to process these
+        'dash-key' => ['dancer','prancer','vixen'],
+        
         # options with dashes in the values are confusing to the user, but not the app...
-        'dasher' => [qw/-a -b -bc -bd/],
+        'valdash' => [qw/-a -b -bc -bd/],
 
         # don't do this.  it means that a required parameter has no values which are good enough
         # better to just delete the program
@@ -57,6 +61,7 @@ use Getopt::Complete (
 );
 
 our %OPTS;
+print "HANDLERS:\n" . Dumper(\%Getopt::Complete::COMPLETION_HANDLERS);
+print "SPEC:\n" . Dumper(\%Getopt::Complete::OPT_SPEC);
 print "RUNNING OPTS:\n" . Dumper(\%OPTS);
-
 1;
