@@ -56,6 +56,7 @@ use Getopt::Complete (
         ## 'no!' => ['this makes no sense, since a boolean flag doesn't complete'],
 );
 
+our %OPTS;
 print "RUNNING OPTS:\n" . Dumper(\%OPTS);
 
 1;

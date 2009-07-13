@@ -13,6 +13,8 @@ our @OPT_SPEC;
 our %OPT_SPEC;
 
 our %OPTS;
+
+our $NO_EXIT_ON_ERRORS;
 our $OPTS_OK;
 our @ERRORS;
 
@@ -20,7 +22,16 @@ our $LONE_DASH_SUPPORT = 1;
 
 sub import {    
     my $class = shift;
-    
+
+    do {
+        no strict 'refs';
+        my $pkg = caller();
+        my $v = \%{ $pkg . "::OPTS" };
+        unless (keys %$v) {
+            *{ $pkg . "::OPTS" } = \%OPTS;
+        }
+    };
+
     # Parse out the options and completions specification. 
     %COMPLETION_HANDLERS = (@_);
     my $bare_args = 0;
@@ -474,21 +485,17 @@ In the Perl program "myprogram":
   use Getopt::Complete (
       'frog'        => ['ribbit','urp','ugh'],
       'fraggle'     => sub { return ['rock','roll'] },
-      'output'      => \&Getopt::Complete::files, 
-      'runthis'     => \&Getopt::Complete::commands, 
-      'somevar'     => \&Getopt::Complete::environment, 
       'quiet!'      => undef,
       'name'        => undef,
       'age=n'       => undef,
-      'person'      => \&Getopt::Complete::users, 
-      'people=s@"   => \&Getopt::Complete::users, 
+      'output'      => \&Getopt::Complete::files, 
+      'runthis'     => \&Getopt::Complete::commands, 
       '<>'          => \&Getopt::Complete::directories, 
   );
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
   complete -C myprogram myprogram
-  
 
 Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 
@@ -510,28 +517,41 @@ Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 =head1 DESCRIPTION
 
 This module makes it easy to add custom command-line completion to
-Perl applications.  It currently works only with the bash shell,
+Perl applications.  This currently works with the bash shell,
 which is the default on most Linux and Mac systems.  
 
-=head1 BACKGROUND ON BASH COMPLETION
+=head1 CHECKING OPTIONS 
+
+Getopt::Complete processes all command-line options at compile time.
+The results are available in the %OPTS hash in the calling package immediately 
+afterward, regardless of whether the shell knows to ask for word-completions.
+
+Errors in shell argumentes result in messages to STDERR via warn(), and cause the 
+program to exit by default.  Getopt::Complete verifies that the option values specified
+match their own completion list, and will otherwise add additional fatal errors. 
+
+It is possible to override any part of the default process, including doing custom 
+parsing, doing processing at run-time, and and preventing exit when there are errors.
+See OVERRIDING PROCESSIND DEFAULTS below for details.
+
+=head1 PROGRAMMABLE COMPLETION BACKGROUND
 
 The bash shell supports smart completion of words when the TAB key is pressed.
-
 By default, bash will presume the word the user is typing is a file name, 
-and will attempt to complete the word accordingly.  Bash can, however, be
-told to run a specific program to handle the completion task.  The "complete" 
-built-in bash command instructs the shell as-to how to handle tab-completion 
-for a given command.  
+and will attempt to complete the word accordingly.  
 
-This module allows a program to be its own word-completer.  It detects
-that the GETOPT_COMPLETE environment variable, or the COMP_LINE and COMP_POINT
-environment variables, are set, and responds by returning completion 
-values suitable for the shell _instead_ of really running the application.
+Bash can, however, be told to run a specific program to handle the completion task.  
+The "complete" built-in bash command instructs the shell as-to how to handle 
+tab-completion for a given command.  
 
-See the manual page for "bash", the heading "Programmable Completion" for
-full details.
+This module allows a program to be its own word-completer.  It detects that the 
+COMP_LINE and COMP_POINT environment variables, are set, and responds by returning 
+completion values suitable for the shell _instead_ of really running the application.
 
-=head1 HOW TO SET THINGS UP
+See the manual page for "bash", the heading "Programmable Completion" for full 
+details.
+
+=head1 HOW TO CONFIGURE PROGRAMMABLE COMPLETION
 
 =over 4
 
@@ -539,13 +559,12 @@ full details.
 
 Put a "use Getopt::Complete" statement into your app as shown in the synopsis.  
 The key-value pairs describe the command-line options available,
-and their completions.  See below for details.
+and their completions.
 
 This should be at the TOP of the app, before any real processing is done.
 
-Options processing in the main body of the program can refer to
-%Getopt::Complete::OPTS for all options at any point, since the 
-options are processed at compile-time.
+Subsequent code can use %OPTS instead of doing any futher options
+parsing.
 
 =item 2
 
@@ -555,7 +574,8 @@ Put the following in your .bashrc or .bash_profile:
 
 =item 3
 
-New logins will automatically run the above.  For shells you already
+New logins will automatically run the above and become aware that your
+program has programmable completion.  For shells you already
 have open, run this to alert bash to your that your program has
 custom tab-completion.
 
@@ -575,7 +595,8 @@ will actually run "normally" every time you press <TAB> with it on the command-l
 The module will not be present to detect that this is not a "real" execution 
 of the program, and you may find your program is running when it should not.
 
-=head1 KEYS
+
+=head1 KEYS IN THE OPTIONS SPECIFICATION
 
 Each key in the list decribes an option which can be completed.  Any 
 key usable in a Getopt:::Long GetOptions specification works here, 
@@ -583,20 +604,20 @@ key usable in a Getopt:::Long GetOptions specification works here,
 
 =over 4
 
-=item a Getopt::Long option specifier
-
-Any specification usable by L<Getopt::Long> is valid as the key.
-For example:
-
-  'p1=s' => [...]
-  'p2=s@' => [...]
-
-=item plain text
+=item option name
 
 A normal word is interpreted as an option name. The '=s' specifier is
 presumed if no specifier is present.
 
   'p1' => [...]
+
+=item a complete option specifier
+
+Any specification usable by L<Getopt::Long> is valid as the key.
+For example:
+
+  'p1=s' => [...]       # the same as just 'p1'
+  'p2=s@' => [...]      # expect multiple values
 
 =item '<>'
 
@@ -607,9 +628,9 @@ It presumes multiple values are possible (like '=s@'):
 
 =back
 
-=head1 VALUES
+=head1 VALUES IN THE OPTIONS SPECIFICATION
 
-Each value describes how the option in question option should be completed.
+Each value describes how the option in question should be completed.
 
 =over 4
 
@@ -625,11 +646,11 @@ An array reference expliciitly lists the valid values for the option.
 
   In the shell:
 
-    myprogram --color <TAB>
+    $ myprogram --color <TAB>
     red green blue
 
-    myprogram --color blue
-    blue!
+    $ myprogram --color blue
+    (runs with no errors)
 
 The list of value is also used to validate the user's choice after options
 are processed:
@@ -642,87 +663,37 @@ See below for details on how to permit values which aren't shown in completions.
 =item undef 
 
 An undefined value indicates that the option is not completable.  No completions
-will be offered by the application, and any value provided by the user will be
+will be offered by the application, though any value provided by the user will be
 considered valid.
 
-This value is also used by boolean parameters, since there is no value to specify ever.
+Note that this is distinct from returning an empty arrayref from a callback, which 
+implies that there ARE known completions but the user has failed to match any of them.
+
+Also note: this is the only valid completion for boolean parameters, since there is no 
+value to specify on the command-line.
 
   use Getopt::Complete (
     'first_name'        => undef,
     'is_perky!'         => undef,
-    'favorite_color'    => ['red','green','blue'],
-    'myfile'            => 'Getopt::Complete::files',
   );
 
-=item subroutine reference 
+=item subroutine callback 
 
 When the list of valid values must be determined dynamically, a subroutine reference or
-name can be specified.
+name can be specified.  If a name is specified, it should be fully qualified.  (If
+it is not, it will be presumed to refer to one of the bash builtin completions types.
+See BUILTIN COMPLETION TYPES below.)
 
-This will be called, and expected to return an arrayref of possiible matches.  The
-arrayref will be treated as though it were specified directly.
+The subroutine will be called, and is expected to return an arrayref of possiible matches.  
+The arrayref will be treated as though it were specified directly.
 
-An empty arrayref indicated that there are no valid matches for this option, given
-the other params on the command-line, and the text already typed.
-
+As with explicit values, an empty arrayref indicated that there are no valid matches 
+for this option, given the other params on the command-line, and the text already typed.
 An undef value indicates that any value is valid for this parameter.
-
-=item fully-qualified subroutine name
-
-A text string will be presumed to be a subroutine name, which will be called as above.
-See above under "subroutines reference".
-
-=item a builtin completion
-
-The bash shell supports a host of standard completions, such as file paths, directory paths, users
-groups, etc., by defining subroutines which implement or immitate them.
-
-These are actually just another case of the subrotine reference listed above.
-
-These are all equivalent:
-   file1 => \&Getopt::Complete::files
-   file1 => \&Getopt::Complete::f
-   file1 => 'Getopt::Complete::files'
-   file1 => 'Getopt::Complete::f'
-   file1 => 'files'
-   file1 => 'f'
-
-See USING BUILTIN COMPLETIONS below.
 
 =back
 
-=head1 USING OPTIONS DURING NORMAL EXECUTION
-
-When NOT servicing completion requiests, Getopt::Complete still wraps Getopt::Long,
-and processes @ARGV for for the application at compile-time.  This is a convenience, 
-to keep the developer from having to list the same information for the options parser
-as it did for the shell-completion.  It also does additional checking to ensure
-that supplied values match the specified completion options.
-
-The fully processed command-line (via Getopt::Long) available as the following hash:
-
- %Getopt::Complete::OPTS;
-
-The bare left arguments after command-line processing are in 
-the '<>' key of the OPTS hash.  Besides that key, the rest of
-the hash is what you would expect from GetOptions(\%h, @specs).
-
-Errors from GetOptions() are captured here:
-
- @Getopt::Complete::ERRORS
-
-These include the normal warnings emitted by Getopt::Long, and also
-additional errors if any parameters have a value not considered a valid
-completion option.
-
-This module restores @ARGV to its original state after processing, so 
-independent option processing can be done if necessary, though this is usually not
-needed.  To use an alternate options processor, you can extract just the
-normalized keys from the Getopt::Complete spec as:
-
- @Getopt::Complete::OPT_SPEC;
-
-=head1 USING SUBROUTINE CALLBACKS
+=head1 WRITING SUBROUTINE CALLBACKS
 
 A subroutine callback is useful when the list of options to match must be dynamically generated.
 
@@ -829,19 +800,29 @@ The list of builtin types supported as-of this writing are:
     aliases
     builtins
 
+See "man bash", in the Programmable Complete secion, and the "compgen" builtin command for more details.
+
 To indicate that an argument's valid values are one of the above, use the exact string
 after Getopt::Complete:: as the completion callback.  For example:
 
   use Getopt::Complete (
-    infile  => 'Getopt::Complete::files',     # full version
-    outfile => 'Getopt::Complete::f',         # the short name for the above is sufficient 
+    infile  => 'Getopt::Complete::files',       
+    outdir  => 'Getopt::Complete::directories', 
     myuser  => 'Getopt::Complete::users',
   );
 
-
-See "man bash", in the Programmable Complete secion, and the "compgen" builtin command for more details.
-
 The full name is alissed as the single-character compgen parameter name for convenience.
+Further, because Getopt::Complete is the default namespace during processing, it can
+be ommitted from callback function names.
+
+These are all equivalent:
+
+   file1 => \&Getopt::Complete::files
+   file1 => \&Getopt::Complete::f
+   file1 => 'Getopt::Complete::files'
+   file1 => 'Getopt::Complete::f'
+   file1 => 'files'
+   file1 => 'f'
 
 =head1 UNLISTED VALID VALUES
 
@@ -896,9 +877,34 @@ A lone dash is often used to represent using STDIN instead of a file for applica
 This is supported by all options which complete with the "files" builtin, though it does not appear in completions.
 To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
+=head1 OVERRIDING COMPILE-TIME OPTION PARSING 
+
+Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
+GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
+Getopt::Long should occur in a BEGIN block before usingGetopt::Complete.
+
+The %OPTS hash itself is an alias for %Getopt::Complete::OPTS.  The alias is not created 
+if %main::OPTS already exists with data.
+
+To prevent Getopt::Complete from exiting at compile time if there are errors,
+the NO_EXIT_ON_ERRORS flag should be set first, at compile time, before using
+the Getopt::Complete module as follows:
+
+ BEGIN { $Getopt:Complete::NO_EXIT_ON_ERRORS = 1; }
+
+Errors will be retained in:
+ 
+ @Getopt::Complete::ERRORS
+
+This module restores @ARGV to its original state after processing, so 
+independent option processing can be done if necessary.  The full
+spec imported by Getopt::Complete is stored as:
+
+ @Getopt::Complete::OPT_SPEC;
+ 
 =head1 BUGS
 
-Some uses of Getopt::Long will not work: multi-name options, +, :, --no-*, --no*.
+Some uses of Getopt::Long will not work currently: multi-name options, +, :, --no-*, --no*.
 
 The logic to "shorten" the completion options shown in some cases is still in development. 
 This means that filename completion shows full paths as options instead of just the basename of the file in question.
