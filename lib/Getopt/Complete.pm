@@ -277,7 +277,7 @@ sub invalid_options {
             if (ref($completions) eq 'CODE') {
                 # we pass in the value as the "completeme" word, so that the callback
                 # can be as optimal as possible in determining if that value is acceptable.
-                $completions = $completions->(undef,$value,$key);
+                $completions = $completions->(undef,$value,$key,\%OPTS);
                 if (not defined $completions or not ref($completions) eq 'ARRAY' or @$completions == 0) {
                     # if not, we give it the chance to give us the full list of options
                     $completions = $COMPLETION_HANDLERS{$key}->(undef,undef,$key);
@@ -480,7 +480,6 @@ In the Perl program "myprogram":
       'quiet!'      => undef,
       'name'        => undef,
       'age=n'       => undef,
-      'guess'       = 'myfunction_below',
       'person'      => \&Getopt::Complete::users, 
       'people=s@"   => \&Getopt::Complete::users, 
       '<>'          => \&Getopt::Complete::directories, 
@@ -512,11 +511,7 @@ Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 
 This module makes it easy to add custom command-line completion to
 Perl applications.  It currently works only with the bash shell,
-which is the default on most Linux and Mac systems.  Patches
-for other shells are welcome.
-
-It also wraps Getopt::Long, so you don't have to specify the command-line
-options twice to get completions AND regular options processing.
+which is the default on most Linux and Mac systems.  
 
 =head1 BACKGROUND ON BASH COMPLETION
 
@@ -542,11 +537,15 @@ full details.
 
 =item 1
 
-Put a "use Getopt::Complete" statment into your app as shown in the synopsis.  
+Put a "use Getopt::Complete" statement into your app as shown in the synopsis.  
 The key-value pairs describe the command-line options available,
 and their completions.  See below for details.
 
 This should be at the TOP of the app, before any real processing is done.
+
+Options processing in the main body of the program can refer to
+%Getopt::Complete::OPTS for all options at any point, since the 
+options are processed at compile-time.
 
 =item 2
 
@@ -695,9 +694,10 @@ See USING BUILTIN COMPLETIONS below.
 =head1 USING OPTIONS DURING NORMAL EXECUTION
 
 When NOT servicing completion requiests, Getopt::Complete still wraps Getopt::Long,
-and processes @ARGV for for the application.  This is a convenience, to keep 
-the developer from having to list the same information for the options parser
-as it did for the shell-completion.
+and processes @ARGV for for the application at compile-time.  This is a convenience, 
+to keep the developer from having to list the same information for the options parser
+as it did for the shell-completion.  It also does additional checking to ensure
+that supplied values match the specified completion options.
 
 The fully processed command-line (via Getopt::Long) available as the following hash:
 
@@ -705,7 +705,7 @@ The fully processed command-line (via Getopt::Long) available as the following h
 
 The bare left arguments after command-line processing are in 
 the '<>' key of the OPTS hash.  Besides that key, the rest of
-the hash is what you wold expect from GetOptions(\%h, @specs).
+the hash is what you would expect from GetOptions(\%h, @specs).
 
 Errors from GetOptions() are captured here:
 
@@ -714,6 +714,7 @@ Errors from GetOptions() are captured here:
 These include the normal warnings emitted by Getopt::Long, and also
 additional errors if any parameters have a value not considered a valid
 completion option.
+
 This module restores @ARGV to its original state after processing, so 
 independent option processing can be done if necessary, though this is usually not
 needed.  To use an alternate options processor, you can extract just the
@@ -757,20 +758,59 @@ A value of '<>' indicates an unnamed argument (a.k.a "bare argument" or "non-opt
 =item other opts 
 
 It is the hashref resulting from Getopt::Long processing of all of the OTHER arguments.
-
 This is useful when one option limits the valid values for another option. 
 
-See INTERDEPENDENT COMPLETIONS below.
+In some cases, the options which should be available change depending on what other
+options are present, or the values available change depending on other options or their
+values.
 
 =back
+
+The environment variables COMP_LINE and COMP_POINT have the exact text
+of the command-line and also the exact character position, if more detail is 
+needed in raw form than the parameters provide.
 
 The return value is a list of possible matches.  The callback is free to narrow its results
 by examining the current word, but is not required to do so.  The module will always return
 only the appropriate matches.
 
-Note that the environment variables COMP_LINE and COMP_POINT have the exact text
-of the command-line and also the exact character position, if more detail is 
-needed in raw form than the parameters provide.
+=head2 EXAMPLE 
+
+This app takes 2 parameters, one of which is dependent on the other:  
+
+  use Getopt::Complete (
+    type => ['names','places','things'],
+    instance => sub {
+            my ($command, $value, $option, $other_opts) = @_;
+            if ($other_opts{type} eq 'names') {
+                return [qw/larry moe curly/],
+            }
+            elsif ($other_opts{type} eq 'places') {
+                return [qw/here there everywhere/],
+            }
+            elsif ($other_opts{type} eq 'things') {
+                return [ query_database_matching("${value}%") ]
+            }
+            elsif ($otper_opts{type} eq 'surprsing') {
+                # no defined list: take anything typed
+                return undef;
+            }
+            else {
+                # invalid type: no matches
+                return []
+            }
+        }
+   );
+
+   $ myprogram --type people --instance <TAB>
+   larry moe curly
+
+   $ myprogram --type places --instance <TAB>
+   here there everywhere
+
+   $ myprogram --type surprising --instance <TAB>
+   (no completions appear)   
+
 
 =head1 BUILTIN COMPLETIONS
 
@@ -795,7 +835,7 @@ after Getopt::Complete:: as the completion callback.  For example:
   use Getopt::Complete (
     infile  => 'Getopt::Complete::files',     # full version
     outfile => 'Getopt::Complete::f',         # the short name for the above is sufficient 
-    myuser  => 'Getopt::Complete::useris',
+    myuser  => 'Getopt::Complete::users',
   );
 
 
@@ -849,39 +889,11 @@ and internal hackery is used to force the shell to not put a space
 where it isn't needed.  This is not part of the bash programmable completion
 specification.)
 
-=head1 INTERDEPENDENT COMPLETIONS (EXAMINING THE ENTIRE COMMAND LINE) 
-
-In some cases, the options which should be available change depending on what other
-options are present, or the values available change depending on other options or their
-values.
-
-The 4th parameter is an additional hashref, representing the OPTS hash 
-processed with the remainder of the command-line besides the one in 
-question.
-
-  use Getopt::Complete (
-    type => ['names','places'],
-    instance => sub {
-            my ($command, $value, $option, $other_opts) = @_;
-            if ($other_opts{type} eq 'names') {
-                return [qw/larry moe curly/],
-            }
-            elsif ($other_opts{type} eq 'places') {
-                return [qw/here there everywhere/],
-            }
-        }
-   );
-
-   $ myprogram --type people --instance <TAB>
-   larry moe curly
-
-   $ myprogram --type places --instance <TAB>
-   here there everywhere
-
 =head1 THE LONE DASH
 
 A lone dash is often used to represent using STDIN instead of a file for applications which otherwise take filenames.
 
+This is supported by all options which complete with the "files" builtin, though it does not appear in completions.
 To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
 =head1 BUGS
@@ -894,7 +906,7 @@ This means that filename completion shows full paths as options instead of just 
 =head1 IN DEVELOPMENT
 
 Currently this module only supports bash, though other shells could be added easily.
-Please submit a patch!
+Submit a patch!  It's probably very easy.
 
 There is logic in development to have the tool possibly auto-update the user's .bashrc / .bash_profile, but this
 is incomplete.
