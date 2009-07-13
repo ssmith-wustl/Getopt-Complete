@@ -22,7 +22,12 @@ Getopt::Complete->import(
 
         # handle unnamed arguments from the command-line ("non-option" arguments) with a spcial key:
         # you can control completions on these too...
-        '<>'      => $Getopt::Complete::files,
+        '<>'      => undef, #'d',
+
+        # the "lonesome dash"
+        #''        => undef,
+
+        'x'       => 'f',
 
         # CODE callbacks allow a the completion list to be dynamically resolved 
         'fraggle' => sub { return ['rock','roll'] },
@@ -51,11 +56,15 @@ Getopt::Complete->import(
 
         # don't do this.  it means that a required parameter has no values which are good enough
         # better to just delete the program
-        'ujustcantwin' => [],
+        # we'll kill it for you
+        
+        ## 'ujustcantwin' => [],
+
+        ## 'no!' => ['this makes no sense, since a boolean flag doesn't complete'],
 );
 
 print "RUNNING WITH handlers, OPTS, SPEC, ARGV,:\n" . Dumper(
-    \%Getopt::Complete::handlers,
+    \%Getopt::Complete::COMPLETION_HANDLERS,
     \%Getopt::Complete::OPTS, 
     \@Getopt::Complete::OPT_SPEC,
     \@ARGV

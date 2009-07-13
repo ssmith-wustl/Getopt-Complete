@@ -16,26 +16,61 @@ our %OPTS;
 our $OPTS_OK;
 our @ERRORS;
 
+our $LONE_DASH_SUPPORT = 1;
+
 sub import {    
     my $class = shift;
     
     # Parse out the options and completions specification. 
     %COMPLETION_HANDLERS = (@_);
     my $bare_args = 0;
+    my $parse_errors;
     for my $key (sort keys %COMPLETION_HANDLERS) {
-        my ($name,$spec) = ($key =~ /^([\w|\-]\w+|\<\>)(.*)/);
+        my ($name,$spec) = ($key =~ /^([\w|-]\w*|\<\>|)(\W.*|)/);
         if (not defined $name) {
-            print STDERR __PACKAGE__ . " is unable to parse $key! from spec!";
+            print STDERR __PACKAGE__ . " is unable to parse '$key' from spec!";
+            $parse_errors++;
             next;
         }
-        $COMPLETION_HANDLERS{$name} = delete $COMPLETION_HANDLERS{$key};
+        my $handler = delete $COMPLETION_HANDLERS{$key};
+        if ($handler and not ref $handler) {
+            my $code;
+            eval {
+                $code = \&{ $handler };
+            };
+            unless (ref($code)) {
+                print STDERR __PACKAGE__ . " $key! references callback $handler which is not found!  Did you use its module first?!";
+                $parse_errors++;
+            }
+            $handler = $code;
+        }
+        $COMPLETION_HANDLERS{$name} = $handler;
         if ($name eq '<>') {
             $bare_args = 1;
             next;
         }
+        if ($name eq '-') {
+            if ($spec and $spec ne '!') {
+                print STDERR __PACKAGE__ . " $key errors: $name is implicitly boolean!";
+                $parse_errors++;
+            }
+            $spec ||= '!';
+        }
         $spec ||= '=s';
         push @OPT_SPEC, $name . $spec;
         $OPT_SPEC{$name} = $spec;
+        if ($spec =~ /[\!\+]/ and defined $COMPLETION_HANDLERS{$key}) {
+            print STDERR __PACKAGE__ . " error on option $key: ! and + expect an undef completion list, since they do not have values!";
+            $parse_errors++;
+            next;
+        }
+        if (ref($COMPLETION_HANDLERS{$key}) eq 'ARRAY' and @{ $COMPLETION_HANDLERS{$key} } == 0) {
+            print STDERR __PACKAGE__ . " error on option $key: an empty arrayref will never be valid!";
+            $parse_errors++;
+        }
+    }
+    if ($parse_errors) {
+        exit 1;
     }
 
     if ($ENV{COMP_LINE}) {
@@ -55,12 +90,13 @@ sub import {
         # it's hard to spot the case in which the previous word is "boolean", and has no value specified
         if ($previous) {
             my ($name) = ($previous =~ /^-+(.*)/);
-            if ($OPT_SPEC{$name} =~ /\!/) {
+            if ($OPT_SPEC{$name} =~ /[\!\+]/) {
                 push @other_options, $previous;
                 $previous = undef;
             }
         }
         @ARGV = @other_options;
+        local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
         $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
         @Getopt::Complete::ERRORS = invalid_options();
         $Getopt::Complete::OPTS_OK = 0 if $Getopt::Complete::ERRORS;
@@ -125,12 +161,12 @@ sub resolve_possible_completions {
     my @possibilities;
 
     my ($dashes,$resolve_values_for_option_name) = ($previous =~ /^(--)(.*)/); 
-    
+   
     if (not length $previous) {
         # an unqalified argument, or an option name
         if ($current =~ /^(-+)/) {
             # the incomplete word is an option name
-            @possibilities = map { '--' . $_ } grep { $_ ne '<>' } @args;
+            @possibilities = map { length($_) ? ('--' . $_) : ('-') } grep { $_ ne '<>' } @args;
         }
         else {
             # bare argument
@@ -138,6 +174,8 @@ sub resolve_possible_completions {
         }
     }
 
+    #print STDERR ">> $command, $current, $previous, $all, $dashes, $resolve_values_for_option_name, p: @possibilities\n";
+    
     if ($resolve_values_for_option_name) {
         # either a value for a named option, or a bare argument.
         if (my $handler = $COMPLETION_HANDLERS{$resolve_values_for_option_name}) {
@@ -245,11 +283,18 @@ sub invalid_options {
     for my $key (sort keys %COMPLETION_HANDLERS) {
         my $completions = $COMPLETION_HANDLERS{$key};
         
-        next if ($key eq '<>');
-        my ($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
-        if (not defined $name) {
-            print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
-            next;
+        my ($dashes,$name,$spec);
+        if ($key eq '<>') {
+            $name = '<>',
+            $spec = '=s@';
+        }
+        else {
+            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]\w*|\<\>|)(\W.*|)/);
+            #($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
+            if (not defined $name) {
+                print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
+                next;
+            }
         }
 
         my @values = (ref($OPTS{$name}) ? @{ $OPTS{$name} } : $OPTS{$name});
@@ -275,7 +320,7 @@ sub invalid_options {
                 push @valid_values, @{ pop(@valid_values) };
             }
             unless (grep { $_ eq $value } map { /(.*)\t$/ ? $1 : $_ } @valid_values) {
-                my $msg = (($key || 'arguments') . " has invalid value " . Data::Dumper::Dumper($value) . ": select from " . Data::Dumper::Dumper(\@valid_values) . "\n");
+                my $msg = (($key || 'arguments') . " has invalid value $value.  Select from: " . join(", ", @valid_values) . "\n");
                 push @failed, $msg;
             }
         }
@@ -297,6 +342,10 @@ sub files {
     }
     if (-d $value) {
         push @f, [$value];
+        push @{$f[-1]},'-' if $LONE_DASH_SUPPORT;
+    }
+    else {
+        push @f, ['-'] if $LONE_DASH_SUPPORT;
     }
     return \@f;
 }
@@ -333,7 +382,10 @@ for my $subname (qw/
     my $option = substr($subname,0,1);
     my $code = sub {
         my ($command,$value,$key,$opts) = @_;
-        [ map { chomp } grep { $_ !~/^\s+$/ } `bash -c "compgen -$option '$value'"` ], 
+        #[ map { chomp } grep { $_ !~/^\s+$/ } `bash -c "compgen -$option '$value'"` ], 
+        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option '$value'"`;
+        chomp @f;
+        return \@f;
     };
     no strict 'refs';
     *$subname = $code;
@@ -597,10 +649,6 @@ Each value describes how the option in question option should be completed.
 
 An array reference expliciitly lists the valid values for the option.
 
-  use Getopt::Complete (
-    'color'    => ['red','green','blue'],
-  );
-
   In the app:
 
     use Getopt::Complete (
@@ -615,9 +663,14 @@ An array reference expliciitly lists the valid values for the option.
     myprogram --color blue
     blue!
 
+The list of value is also used to validate the user's choice after options
+are processed:
+
     myprogram --color purple
     ERROR: color has invalid value purple: select from red green blue
-    
+
+See below for details on how to permit values which aren't shown in completions.
+
 =item undef 
 
 An undefined value indicates that the option is not completable.  No completions
@@ -862,6 +915,12 @@ the OPTS hash processed with the remainder of the command-line.
 Note that the environment variables COMP_LINE and COMP_POINT have the exact text
 of the command-line and also the exact character position, if more detail is 
 needed.
+
+=head1 THE LONE DASH
+
+A lone dash is often used to represent using STDIN instead of a file for applications which otherwise take filenames.
+
+To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
 =head1 BUGS
 
