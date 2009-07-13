@@ -1,105 +1,477 @@
 NAME
-    Getopt::Complete - add bash autocompletion to Perl applications
+    Getopt::Complete - custom programmable shell completion for Perl apps
 
 SYNOPSIS
-    In the Perl program "myprogram"
+    In the Perl program "myprogram":
 
-        use Getopt::Complete '--frog' => ['ribbit','urp','ugh'], '--fraggle'
-        => sub { return ['rock','roll'] }, '--person' =>
-        \&Getopt::Complete::users, '--output' => \&Getopt::Complete::files,
-        '--exec' => \&Getopt::Complete::commands, '' =>
-        \&Getopt::Complete::environment, ;
+      use Getopt::Complete (
+          'frog'        => ['ribbit','urp','ugh'],
+          'fraggle'     => sub { return ['rock','roll'] },
+          'quiet!'      => undef,
+          'name'        => undef,
+          'age=n'       => undef,
+          'output'      => \&Getopt::Complete::files, 
+          'runthis'     => \&Getopt::Complete::commands, 
+          '<>'          => \&Getopt::Complete::directories, 
+      );
+      print "the frog says " . $OPTS{frog} . "\n";
 
-    Next we tell the shell that it can get auto-completion for "myprogram"
-    by runing myprogram with a special environment variable set.
+    In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
-    This line goes in the user's .bashrc, .bash_profile or system
-    /etc/bashrc or /etc/bash_profile:
+      complete -C myprogram myprogram
 
-        complete -C 'GETOPT_COMPLETION=bash myprogram' myprogram
+    Thereafter in the terminal (after next login, or sourcing the updated
+    .bashrc):
 
-    Note: the syntax is intended to support multiple shells, but currently
-    bash is the only supported value.
+      $ myprogram --f<TAB>
+      $ myprogram --fr
+
+      $ myprogram --fr<TAB><TAB>
+      frog fraggle
+
+      $ myprogram --fro<TAB>
+      $ myprogram --frog 
+
+      $ myprogram --frog <TAB>
+      ribbit urp ugh
+
+      $ myprogram --frog r<TAB>
+      $ myprogram --frog ribbit
 
 DESCRIPTION
-    The bash shell supports smart completion of words when the TAB key is
-    pressed.
+    This module makes it easy to add custom command-line completion to Perl
+    applications, and makes using the shell arguments in the program
+    hassle-free as well.
 
-    By default, bash will presume the word the user is typing is a file
-    name, and will attempt to complete the word accordingly. Bash can,
-    however, be told to run a specific program to handle the completion
-    task.
+    The completion features currently work with the bash shell, which is the
+    default on most Linux and Mac systems. Patches for other shells are
+    welcome.
 
-    This module allows a program to be its own word-completer.
+    For more information go to:
 
-    The "use" statement for the module takes a list of key-value pairs to
-    control the process. The format is described below.
+     http://github.com/sakoht/Getopt--Complete-for-Perl/
 
-KEYS
-    Each key in the list decribes an option which can be completed.
+OPTIONS PROCESSING
+    Getopt::Complete processes the command-line options at compile time.
 
-    plain text
-        A normal word is interpreted as an option name. Dashes are optinal.
-        Getopt-style suffixes are ignored as well.
+    The results are avaialble in an %OPTS hash:
 
-    a blank string ('')
-        A blank key specifiies how to complete non-option (bare) arguments.
+      use Getopt::Complete (
+        'mydir'     => 'd',
+        'myfile'    => 'f',
+        '<>'        =  ['monkey', 'taco', 'banana']
+      );
 
-VALUES
-    Each value describes how that option should be completed.
+      for $opt (keys %OPTS) {
+        $val = $OPTS{$opt};
+        print "$opt has value $val\n";
+      }
+
+    Errors in shell argumentes result in messages to STDERR via warn(), and
+    cause the program to exit during "use". Getopt::Complete verifies that
+    the option values specified match their own completion list, and will
+    otherwise add additional errors explaining the problem.
+
+    The %OPTS hash is an alias for %Getopt::Complete::OPTS. The alias is not
+    created in the caller's namespaces if a hash named %OPTS already exists
+    with data.
+
+    It is possible to override any part of the default process, including
+    doing custom parsing, doing processing at run-time, and and preventing
+    exit when there are errors. See OVERRIDING PROCESSING DEFAULTS below for
+    details.
+
+PROGRAMMABLE COMPLETION BACKGROUND
+    The bash shell supports smart completion of words when the <TAB> key is
+    pressed. By default, after the prgram name is specified, bash will
+    presume the word the user is typing a is a file name, and will attempt
+    to complete the word accordingly. Where completion is ambiguous, the
+    shell will go as far as it can and beep. Subsequent completion attempts
+    at that position result in a list being shown of possible completions.
+
+    Bash can be configured to run a specific program to handle the
+    completion task. The "complete" built-in bash command instructs the
+    shell as-to how to handle tab-completion for a given command.
+
+    This module allows a program to be its own word-completer. It detects
+    that the COMP_LINE and COMP_POINT environment variables, are set, and
+    responds by returning completion values suitable for the shell _instead_
+    of really running the application.
+
+    See the manual page for "bash", the heading "Programmable Completion"
+    for full details on the general topic.
+
+HOW TO CONFIGURE PROGRAMMABLE COMPLETION
+    1   Put a "use Getopt::Complete" statement into your app as shown in the
+        synopsis. The key-value pairs describe the command-line options
+        available, and their completions.
+
+        This should be at the TOP of the app, before any real processing is
+        done.
+
+        Subsequent code can use %OPTS instead of doing any futher options
+        parsing. Existing apps can have their call to Getopt::Long converted
+        into "use Getopt::Complete".
+
+    2   Put the following in your .bashrc or .bash_profile:
+
+          complete -C myprogram myprogram
+
+    3   New logins will automatically run the above and become aware that
+        your program has programmable completion. For shells you already
+        have open, run this to alert bash to your that your program has
+        custom tab-completion.
+
+          source ~/.bashrc 
+
+    Type the name of your app ("myprogram" in the example), and experiment
+    with using the <TAB> key to get various completions to test it. Every
+    time you hit <TAB>, bash sets certain environment variables, and then
+    runs your program. The Getopt::Complete module detects these variables,
+    responds to the completion request, and then forces the program to exit
+    before really running your regular application code.
+
+    IMPORTANT: Do not do steps #2 and #3 w/o doing step #1, or your
+    application will actually run "normally" every time you press <TAB> with
+    it on the command-line! The module will not be present to detect that
+    this is not a "real" execution of the program, and you may find your
+    program is running when it should not.
+
+KEYS IN THE OPTIONS SPECIFICATION
+    Each key in the list decribes an option which can be completed. Any key
+    usable in a Getopt:::Long GetOptions specification works here, (except
+    as noted in BUGS below):
+
+    an option name
+        A normal word is interpreted as an option name. The '=s' specifier
+        is presumed if no specifier is present.
+
+          'p1' => [...]
+
+    a complete option specifier
+        Any specification usable by Getopt::Long is valid as the key. For
+        example:
+
+          'p1=s' => [...]       # the same as just 'p1'
+          'p2=s@' => [...]      # expect multiple values
+
+    the '<>' symbol for "bare arguments"
+        This special key specifies how to complete non-option (bare)
+        arguments. It presumes multiple values are possible (like '=s@'):
+
+        Have an explicit list: '<>' = ['value1','value2','value3']
+
+        Do normal file completion: '<>' = 'files'
+
+        Take arbitrary values with no expectations: '<>' = undef
+
+        If there is no '<>' key specified, bare arguments will be treated as
+        an error.
+
+VALUES IN THE OPTIONS SPECIFICATION
+    Each value describes how the option in question should be completed.
 
     array reference
         An array reference expliciitly lists the valid values for the
         option.
 
+          In the app:
+
+            use Getopt::Complete (
+                'color'    => ['red','green','blue'],
+            );
+
+          In the shell:
+
+            $ myprogram --color <TAB>
+            red green blue
+
+            $ myprogram --color blue
+            (runs with no errors)
+
+        The list of value is also used to validate the user's choice after
+        options are processed:
+
+            myprogram --color purple
+            ERROR: color has invalid value purple: select from red green blue
+
+        See below for details on how to permit values which aren't shown in
+        completions.
+
     undef
-        An undefined value indicates that the option has no following value
-        (for boolean flags)
+        An undefined value indicates that the option is not completable. No
+        completions will be offered by the application, though any value
+        provided by the user will be considered valid.
 
-    subroutine reference
-        This will be called, and expected to return an array of possiible
-        matches.
+        Note that this is distinct from returning an empty arrayref from a
+        callback, which implies that there ARE known completions but the
+        user has failed to match any of them.
 
-    plain text
-        A text string will be presumed to be a subroutine name, which will
-        be called as above.
+        Also note: this is the only valid completion for boolean parameters,
+        since there is no value to specify on the command-line.
 
-    There is a built-in subroutine which provides access to compgen, the
-    bash built-in which does completion on file names, command names, users,
-    groups, services, and more.
+          use Getopt::Complete (
+            'first_name'        => undef,
+            'is_perky!'         => undef,
+          );
 
-    See USING BUILTIN COMPLETIONS below.
+    subroutine callback
+        When the list of valid values must be determined dynamically, a
+        subroutine reference or name can be specified. If a name is
+        specified, it should be fully qualified. (If it is not, it will be
+        presumed to refer to one of the bash builtin completions types. See
+        BUILTIN COMPLETION TYPES below.)
 
-USING SUBROUTINE CALLBACKS
-    A subroutine callback will always receieve two arguments:
+        The subroutine will be called, and is expected to return an arrayref
+        of possiible matches. The arrayref will be treated as though it were
+        specified directly in the specification.
+
+        As with explicit values, an empty arrayref indicated that there are
+        no valid matches for this option, given the other params on the
+        command-line, and the text already typed. An undef value indicates
+        that any value is valid for this parameter.
+
+        Parameters to the callback are described below.
+
+WRITING SUBROUTINE CALLBACKS
+    A subroutine callback is useful when the list of options to match must
+    be dynamically generated.
+
+    It is also useful when knowing what the user has already typed helps
+    narrow the search for valid completions, or when iterative completion
+    needs to occur (see PARTIAL COMPLETIONS below).
+
+    The callback is expected to return an arrayref of valid completions. If
+    it is empty, no completions are considered valid. If an undefined value
+    is returned, no completions are specified, but ANY arbitrary value
+    entered is considered valid as far as error checking is concerned.
+
+    The callback registerd in the completion specification will receive the
+    following parameters:
+
+    command name
+        Contains the name of the command for which options are being parsed.
+        This is $0 in most cases, though hierarchical commands may have a
+        name "svn commit" or "foo bar baz" etc.
 
     current word
         This is the word the user is trying to complete. It may be an empty
-        string, if the user hits <Tab> without typiing anything first.
+        string, if the user hits <Tab> without typing anything first.
 
-    previous option
-        This is the option argument to the left of the word the user is
-        typing. If the word to the left is not an option argument, or there
-        is no word to the left besidies the command itself, this will be an
-        empty string.
+    option name
+        This is the name of the option for which we are resolving a value.
+        It is typically ignored unless you use the same subroutine to
+        service multiple options.
+
+        A value of '<>' indicates an unnamed argument (a.k.a "bare argument"
+        or "non-option" argument).
+
+    other opts
+        It is the hashref resulting from Getopt::Long processing of all of
+        the OTHER arguments. This is useful when one option limits the valid
+        values for another option.
+
+        In some cases, the options which should be available change
+        depending on what other options are present, or the values available
+        change depending on other options or their values.
+
+    The environment variables COMP_LINE and COMP_POINT have the exact text
+    of the command-line and also the exact character position, if more
+    detail is needed in raw form than the parameters provide.
 
     The return value is a list of possible matches. The callback is free to
     narrow its results by examining the current word, but is not required to
     do so. The module will always return only the appropriate matches.
 
-USING BUILTIN COMPLETIONS
-    Any of the default shell completions supported by bash's compgen are
-    supported by this module. The full name is alissed as the
-    single-character compgen parameter name for convenience.
+  EXAMPLE
+    This app takes 2 parameters, one of which is dependent on the other:
 
-    See "man bash", in the Programmable Complete secion for more details.
+      use Getopt::Complete (
+        type => ['names','places','things'],
+        instance => sub {
+                my ($command, $value, $option, $other_opts) = @_;
+                if ($other_opts{type} eq 'names') {
+                    return [qw/larry moe curly/],
+                }
+                elsif ($other_opts{type} eq 'places') {
+                    return [qw/here there everywhere/],
+                }
+                elsif ($other_opts{type} eq 'things') {
+                    return [ query_database_matching("${value}%") ]
+                }
+                elsif ($otper_opts{type} eq 'surprsing') {
+                    # no defined list: take anything typed
+                    return undef;
+                }
+                else {
+                    # invalid type: no matches
+                    return []
+                }
+            }
+       );
+
+       $ myprogram --type people --instance <TAB>
+       larry moe curly
+
+       $ myprogram --type places --instance <TAB>
+       here there everywhere
+
+       $ myprogram --type surprising --instance <TAB>
+       (no completions appear)   
+
+BUILTIN COMPLETIONS
+    Bash has a list of built-in value types which it knows how to complete.
+    Any of the default shell completions supported by bash's "compgen" are
+    supported by this module.
+
+    The list of builtin types supported as-of this writing are:
+
+        files
+        directories
+        commands
+        users
+        groups
+        environment
+        services
+        aliases
+        builtins
+
+    See "man bash", in the Programmable Complete secion, and the "compgen"
+    builtin command for more details.
+
+    To indicate that an argument's valid values are one of the above, use
+    the exact string after Getopt::Complete:: as the completion callback.
+    For example:
+
+      use Getopt::Complete (
+        infile  => 'Getopt::Complete::files',       
+        outdir  => 'Getopt::Complete::directories', 
+        myuser  => 'Getopt::Complete::users',
+      );
+
+    The full name is alissed as the single-character compgen parameter name
+    for convenience. Further, because Getopt::Complete is the default
+    namespace during processing, it can be ommitted from callback function
+    names.
+
+    The following are all equivalent. They effectively produce the same list
+    as 'compgen -f':
+
+       file1 => \&Getopt::Complete::files
+       file1 => \&Getopt::Complete::f
+       file1 => 'Getopt::Complete::files'
+       file1 => 'Getopt::Complete::f'
+       file1 => 'files'
+       file1 => 'f'
+
+UNLISTED VALID VALUES
+    If there are options which should not be part of completion lists, but
+    still count as valid if passed-into the app, they can be in a final
+    sub-array at the end. This list doesn't affect the completion system at
+    all, just prevents errors in the ERRORS array described above.
+
+        use Getopt::Complete (
+            'color'    => ['red','green','blue', ['yellow','orange']],
+        );
+
+        myprogram --color <TAB>
+        red green blue
+
+        myprogram --color orange
+        # no errors
+
+        myprogram --color purple
+        # error
+    
+PARTIAL COMPLETIONS
+    Sometimes, the entire list of completions is too big to reasonable
+    resolve and return. The most obvious example is filename completion at
+    the root of a large filesystem. In these cases, the completion of is
+    handled in pieces, allowing the user to gradually "drill down" to the
+    complete value directory by directory. It is even possible to hit <TAB>
+    to get one completion, then hit it again and get more completion, in the
+    case of single-sub-directory directories.
+
+    The Getopt::Complete module supports iterative drill-down completions
+    from any parameter configured with a callback. It is completely valid to
+    complete "a" with "aa" "ab" and "ac", but then to complete "ab" with yet
+    more text.
+
+    Unless the shell knows, however that your "aa", "ab", and "ac"
+    completions are in fact only partial completions, an inconvenient space
+    will be added after the word on the terminal line, as the shell happily
+    moves on to helping the user enter the next argument
+
+    Partial completions are indicated in Getopt::Complete by adding a "\t"
+    tab character to the end of the returned string. This means you can
+    return a mix of partial and full completions, and it will respect each
+    correctly. (The "\t" is actually stripped-off before going to the shell
+    and internal hackery is used to force the shell to not put a space where
+    it isn't needed. This is not part of the bash programmable completion
+    specification.)
+
+THE LONE DASH
+    A lone dash is often used to represent using STDIN instead of a file for
+    applications which otherwise take filenames.
+
+    This is supported by all options which complete with the "files"
+    builtin, though it does not appear in completions. To disable this, set
+    $Getopt::Complete::LONE_DASH = 0.
+
+OVERRIDING COMPILE-TIME OPTION PARSING
+    Getopt::Complete makes a lot of assumptions in order to be easy to use
+    in the default case. Here is how to override that behavior if it's not
+    what you want.
+
+    To prevent Getopt::Complete from exiting at compile time if there are
+    errors, the NO_EXIT_ON_ERRORS flag should be set first, at compile time,
+    before using the Getopt::Complete module as follows:
+
+     BEGIN { $Getopt:Complete::NO_EXIT_ON_ERRORS = 1; }
+
+    This should not affect completions in any way (it will still exit if it
+    realizes it is talking to bash, to prevent accidentally running your
+    program).
+
+    Errors will be retained in:
+
+     @Getopt::Complete::ERRORS
+
+    This module restores @ARGV to its original state after processing, so
+    independent option processing can be done if necessary. The full spec
+    imported by Getopt::Complete is stored as:
+
+     @Getopt::Complete::OPT_SPEC;
+
+    With the flag above, set, you can completely ignore, or partially
+    ignore, the options processing which happens automatically.
+
+    You can also adjust how option processing happens inside of
+    Getopt::Complete. Getopt::Complete wraps Getopt::Long to do the
+    underlying option parsing. It uses GetOptions(\%h, @specification) to
+    produce the %OPTS hash. Customization of Getopt::Long should occur in a
+    BEGIN block before using Getopt::Complete.
+
+DEVELOPMENT
+      git clone git://github.com/sakoht/Getopt--Complete-for-Perl.git
 
 BUGS
-    Currently only supports bash, though other shells could be added easily.
+    The logic to "shorten" the completion options shown in some cases is
+    still in development. This means that filename completion shows full
+    paths as options instead of just the basename of the file in question.
 
-    Imperfect handling of cases where the value in a key-value starts with a
-    dash.
+    Some uses of Getopt::Long will not work currently: multi-name options,
+    +, :, --no-*, --no*.
+
+    Currently this module only supports bash, though other shells could be
+    added easily.
+
+    There is logic in development to have the tool possibly auto-update the
+    user's .bashrc / .bash_profile, but this is incomplete.
+
+SEE ALSO
+    Getopt::Long is the definitive options parser, wrapped by this module.
 
 AUTHOR
-    Scott Smith <scottsmithus yahoo>
+    Scott Smith (sakoht at cpan)
 
