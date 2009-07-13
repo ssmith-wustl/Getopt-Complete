@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv(0.04);
+our $VERSION = qv(0.03);
 
 use Getopt::Long;
 
