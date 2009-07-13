@@ -1,5 +1,11 @@
 Revision history for Getopt-Complete
 
+0.03    2009-07-12
+        No longer need support for 'complete -F' to see the whole command-line.  Code removed.
+        Tons of documentation.
+        Fixed bugs with completion of file and directory paths.
+        Support for partial completions.
+
 0.02    2009-07-11
         Added support for "complete -F" in addition to "complete -C".
         (The app can now examine the entire command-line, not just the option pair currently under consideration.)
