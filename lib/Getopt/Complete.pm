@@ -74,8 +74,7 @@ sub import {
     }
 
     if ($ENV{COMP_LINE}) {
-        # This command has been set to autocomplete via "complete -F".
-        # This is more complicated than the -C option to configure, but more powerful.
+        # This command has been set to autocomplete via "completeF".
         my $left = substr($ENV{COMP_LINE},0,$ENV{COMP_POINT});
         my $current = '';
         if ($left =~ /([^\=\s]+)$/) {
@@ -102,21 +101,6 @@ sub import {
         $Getopt::Complete::OPTS_OK = 0 if $Getopt::Complete::ERRORS;
         #print STDERR Data::Dumper::Dumper([$command,$current,$previous,\@other_options]);
         Getopt::Complete->print_matches_and_exit($command,$current,$previous,\@other_options);
-    }
-    elsif (my $shell = $ENV{GETOPT_COMPLETE}) {
-        print STDERR ">> old!\n";
-        # This command has been set to autocomplete via "complete -C".
-        # This is easiest to set-up, but less info about the command-line is present.
-        if ($shell eq 'bash') {
-            my ($command, $current, $previous) = (map { defined $_ ? $_ : '' } @ARGV);
-            $previous = '' unless $previous =~ /^-/; 
-            Getopt::Complete->print_matches_and_exit($command,$current,$previous);
-        }
-        else {
-            print STDERR "\ncommand-line completion: unsupported shell $shell.  Please submit a patch!  (Or fix your topo.)\n";
-            print " \n";
-            exit;
-        }
     }
     else {
         # Normal execution of the program.
@@ -505,7 +489,7 @@ In the Perl program "myprogram":
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
-  complete -C 'GETOPT_COMPLETE=bash myprogram' myprogram
+  complete -C myprogram myprogram
   
 
 Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
@@ -569,7 +553,7 @@ This should be at the TOP of the app, before any real processing is done.
 
 Put the following in your .bashrc or .bash_profile:
 
-  complete -C 'GETOPT_COMPLETE=bash myprogram' myprogram
+  complete -C myprogram myprogram
 
 =item 3
 
@@ -777,7 +761,6 @@ It is the hashref resulting from Getopt::Long processing of all of the OTHER arg
 
 This is useful when one option limits the valid values for another option. 
 
-This hashref is only available if bash requests completion via the -F option.
 See INTERDEPENDENT COMPLETIONS below.
 
 =back
@@ -785,6 +768,10 @@ See INTERDEPENDENT COMPLETIONS below.
 The return value is a list of possible matches.  The callback is free to narrow its results
 by examining the current word, but is not required to do so.  The module will always return
 only the appropriate matches.
+
+Note that the environment variables COMP_LINE and COMP_POINT have the exact text
+of the command-line and also the exact character position, if more detail is 
+needed in raw form than the parameters provide.
 
 =head1 BUILTIN COMPLETIONS
 
@@ -869,23 +856,9 @@ In some cases, the options which should be available change depending on what ot
 options are present, or the values available change depending on other options or their
 values.
 
-The standard "complete -C" does not supply the entire command-line to the completion
-program, unfortunately.  Getopt::Complete, as of version v0.02, now recognizes when
-bash is configured to call it with "complete -F".  Using this involves adding a
-few more lines of code to your .bashrc or .bash_profile:
-
-  _getopt_complete() {
-      export COMP_LINE COMP_POINT;
-      COMPREPLY=( $( ${COMP_WORDS[0]} ) )
-  }
-
-The "complete" command then can look like this in the .bashrc/.bash_profile: 
-
-  complete -F _getopt_complete myprogram
-
-This has the same effect as the simple "complete -C" entry point, except that
-all callbacks which are subroutines will receive an additional hashref, representing
-the OPTS hash processed with the remainder of the command-line.
+The 4th parameter is an additional hashref, representing the OPTS hash 
+processed with the remainder of the command-line besides the one in 
+question.
 
   use Getopt::Complete (
     type => ['names','places'],
@@ -905,10 +878,6 @@ the OPTS hash processed with the remainder of the command-line.
 
    $ myprogram --type places --instance <TAB>
    here there everywhere
-
-Note that the environment variables COMP_LINE and COMP_POINT have the exact text
-of the command-line and also the exact character position, if more detail is 
-needed.
 
 =head1 THE LONE DASH
 
