@@ -476,7 +476,7 @@ END {
 
 =head1 NAME
 
-Getopt::Complete - custom tab-completion for Perl apps
+Getopt::Complete - custom programmable shell completion for Perl apps
 
 =head1 SYNOPSIS
 
@@ -492,6 +492,7 @@ In the Perl program "myprogram":
       'runthis'     => \&Getopt::Complete::commands, 
       '<>'          => \&Getopt::Complete::directories, 
   );
+  print "the frog says " . $OPTS{frog} . "\n";
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
@@ -517,18 +518,27 @@ Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 =head1 DESCRIPTION
 
 This module makes it easy to add custom command-line completion to
-Perl applications.  This currently works with the bash shell,
-which is the default on most Linux and Mac systems.  
+Perl applications, and makes using the shell arguments in the 
+program hassle-free as well.
 
-=head1 CHECKING OPTIONS 
+The completion features currently work with the bash shell, which is 
+the default on most Linux and Mac systems.  Patches for other shells 
+are welcome.  
 
-Getopt::Complete processes all command-line options at compile time.
-The results are available in the %OPTS hash in the calling package immediately 
-afterward, regardless of whether the shell knows to ask for word-completions.
+=head1 OPTIONS PROCESSING
+
+The %OPTS hash contains all processed command-line arguments,
+during normal execution of the program.   During shell-completion,
+it contains everything EXCEPT the current option being resolved,
+which is passed-into callbacks as separate fields.
 
 Errors in shell argumentes result in messages to STDERR via warn(), and cause the 
 program to exit by default.  Getopt::Complete verifies that the option values specified
 match their own completion list, and will otherwise add additional fatal errors. 
+
+Getopt::Complete processes all command-line options at compile time.
+%Getopt::Complete::OPTS is given an alias in packages which use
+Getopt::Complete.
 
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
@@ -536,11 +546,13 @@ See OVERRIDING PROCESSIND DEFAULTS below for details.
 
 =head1 PROGRAMMABLE COMPLETION BACKGROUND
 
-The bash shell supports smart completion of words when the TAB key is pressed.
-By default, bash will presume the word the user is typing is a file name, 
-and will attempt to complete the word accordingly.  
+The bash shell supports smart completion of words when the <TAB> key is pressed.
+By default, after the prgram name is specified, bash will presume the word the user 
+is typing a is a file name, and will attempt to complete the word accordingly.  Where
+completion is ambiguous, the shell will go as far as it can and beep.  Subsequent
+completion attempts at that position result in a list being shown of possible completions.
 
-Bash can, however, be told to run a specific program to handle the completion task.  
+Bash can be configured to run a specific program to handle the completion task.  
 The "complete" built-in bash command instructs the shell as-to how to handle 
 tab-completion for a given command.  
 
@@ -549,7 +561,7 @@ COMP_LINE and COMP_POINT environment variables, are set, and responds by returni
 completion values suitable for the shell _instead_ of really running the application.
 
 See the manual page for "bash", the heading "Programmable Completion" for full 
-details.
+details on the general topic.
 
 =head1 HOW TO CONFIGURE PROGRAMMABLE COMPLETION
 
@@ -564,7 +576,8 @@ and their completions.
 This should be at the TOP of the app, before any real processing is done.
 
 Subsequent code can use %OPTS instead of doing any futher options
-parsing.
+parsing.  Existing apps can have their call to Getopt::Long converted
+into "use Getopt::Complete".
 
 =item 2
 
@@ -881,10 +894,10 @@ To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
 Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
 GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
-Getopt::Long should occur in a BEGIN block before usingGetopt::Complete.
+Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
 
-The %OPTS hash itself is an alias for %Getopt::Complete::OPTS.  The alias is not created 
-if %main::OPTS already exists with data.
+The %OPTS hash is an alias for %Getopt::Complete::OPTS.  The alias is not created 
+in the caller's namespaces if a hash named %OPTS already exists with data.
 
 To prevent Getopt::Complete from exiting at compile time if there are errors,
 the NO_EXIT_ON_ERRORS flag should be set first, at compile time, before using
