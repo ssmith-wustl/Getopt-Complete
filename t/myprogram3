@@ -27,6 +27,8 @@ Getopt::Complete->import(
         # CODE callbacks allow a the completion list to be dynamically resolved 
         'fraggle' => sub { return ['rock','roll'] },
 
+        'dasher' => [qw/-a -b -bc -bd/],
+
         # support for Bash "compgen" builtins is present with some pre-made callbacks
         'myfile'    => \&Getopt::Complete::files,
         'mydir'     => \&Getopt::Complete::directories,
