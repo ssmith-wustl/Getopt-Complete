@@ -104,6 +104,7 @@ sub import {
         Getopt::Complete->print_matches_and_exit($command,$current,$previous,\@other_options);
     }
     elsif (my $shell = $ENV{GETOPT_COMPLETE}) {
+        print STDERR ">> old!\n";
         # This command has been set to autocomplete via "complete -C".
         # This is easiest to set-up, but less info about the command-line is present.
         if ($shell eq 'bash') {
@@ -151,7 +152,6 @@ sub print_matches_and_exit {
     exit;
 }
 
-
 sub resolve_possible_completions {
     my ($self,$command, $current, $previous, $all) = @_;
 
@@ -174,8 +174,6 @@ sub resolve_possible_completions {
         }
     }
 
-    #print STDERR ">> $command, $current, $previous, $all, $dashes, $resolve_values_for_option_name, p: @possibilities\n";
-    
     if ($resolve_values_for_option_name) {
         # either a value for a named option, or a bare argument.
         if (my $handler = $COMPLETION_HANDLERS{$resolve_values_for_option_name}) {
@@ -216,38 +214,30 @@ sub resolve_possible_completions {
     }
 
     if (@matches == 1) {
-        #print STDERR ">> one match\n";
         # there is one match
         # the shell will complete it if it is not already complete, and put a space at the end
         if ($nospace[0]) {
-            #print STDERR ">> no space\n";
             # We don't want a space, and there is no way to tell bash that, so we trick it.
             if ($matches[0] eq $current) {
-                #print STDERR ">> already complete\n";
                 # it IS done completing the word: return nothing so it doesn't stride forward with a space
                 # it will think it has a bad completion, effectively
                 @matches = ();
             }
             else {
-                #print STDERR ">> incomplete\n";
                 # it IS done completing the word: return nothing so it doesn't stride forward with a space
                 # it is NOT done completing the word
                 # We return 2 items which start with the real value, but have an arbitrary ending.
                 # It will show everything but that ending, and then stop.
-                #print STDERR ">>> matches were @matches\n";
                 push @matches, $matches[0];
                 $matches[0] .= 'A';
                 $matches[1] .= 'B';
-                #print STDERR ">>> matches are now @matches\n";
             }
         }
         else {
             # we do want a space, so just let this go normally
-            #print STDERR ">> we want space\n";
         }
     }
     else {
-        ##print STDERR ">> multiple matches...\n";
         # There are multiple matches.
         # If all of them have a prefix in common, it will complete that much.
         # If not, it will show a list.
@@ -276,7 +266,6 @@ sub resolve_possible_completions {
 
     return @matches;
 }
-
 
 sub invalid_options {
     my @failed;
@@ -622,12 +611,10 @@ For example:
 
 =item plain text
 
-A normal word is interpreted as an option name.  Dashes are also optional.
-These are all equivalent to 'p1=s':
+A normal word is interpreted as an option name. The '=s' specifier is
+presumed if no specifier is present.
 
-  'p1'      => ['value1','value2','value3']
-  '--p1'    => ['value1','value2','value3']
-  '--p1=s'  => ['value1','value2','value3']
+  'p1' => [...]
 
 =item '<>'
 
@@ -635,7 +622,6 @@ This special key specifies how to complete non-option (bare) arguments.
 It presumes multiple values are possible (like '=s@'):
 
  '<>' = ['value1','value2','value3']
-
 
 =back
 
@@ -683,7 +669,7 @@ This value is also used by boolean parameters, since there is no value to specif
     'first_name'        => undef,
     'is_perky!'         => undef,
     'favorite_color'    => ['red','green','blue'],
-    'myfile'            => \&Getopt::Complete::files,
+    'myfile'            => 'Getopt::Complete::files',
   );
 
 =item subroutine reference 
@@ -699,10 +685,10 @@ the other params on the command-line, and the text already typed.
 
 An undef value indicates that any value is valid for this parameter.
 
-=item plain text
+=item fully-qualified subroutine name
 
 A text string will be presumed to be a subroutine name, which will be called as above.
-See above under Subrotine Reference.
+See above under "subroutines reference".
 
 =item a builtin completion
 
@@ -710,6 +696,14 @@ The bash shell supports a host of standard completions, such as file paths, dire
 groups, etc., by defining subroutines which implement or immitate them.
 
 These are actually just another case of the subrotine reference listed above.
+
+These are all equivalent:
+   file1 => \&Getopt::Complete::files
+   file1 => \&Getopt::Complete::f
+   file1 => 'Getopt::Complete::files'
+   file1 => 'Getopt::Complete::f'
+   file1 => 'files'
+   file1 => 'f'
 
 See USING BUILTIN COMPLETIONS below.
 

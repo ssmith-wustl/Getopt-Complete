@@ -22,7 +22,7 @@ Getopt::Complete->import(
 
         # handle unnamed arguments from the command-line ("non-option" arguments) with a spcial key:
         # you can control completions on these too...
-        '<>'      => undef, #'d',
+        '<>'      => 'd',
 
         # the "lonesome dash"
         #''        => undef,
