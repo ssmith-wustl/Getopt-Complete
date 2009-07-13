@@ -100,7 +100,9 @@ sub import {
         @Getopt::Complete::ERRORS = invalid_options();
         $Getopt::Complete::OPTS_OK = 0 if $Getopt::Complete::ERRORS;
         #print STDERR Data::Dumper::Dumper([$command,$current,$previous,\@other_options]);
-        Getopt::Complete->print_matches_and_exit($command,$current,$previous,\@other_options);
+        my @matches = $class->resolve_possible_completions($command,$current,$previous,\@other_options);
+        print join("\n",@matches),"\n";
+        exit;
     }
     else {
         # Normal execution of the program.
@@ -131,9 +133,6 @@ sub import {
 
 sub print_matches_and_exit {
     my $class = shift;
-    my @matches = $class->resolve_possible_completions(@_);
-    print join("\n",@matches),"\n";
-    exit;
 }
 
 sub resolve_possible_completions {
