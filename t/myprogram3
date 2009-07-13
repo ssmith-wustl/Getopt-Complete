@@ -2,9 +2,7 @@
 use strict;
 use Data::Dumper;
 
-require Getopt::Complete;
-
-Getopt::Complete->import(
+use Getopt::Complete (
         # list the explicit values which are valid for this option
         'frog'    => ['ribbit','urp','ugh'],
 
