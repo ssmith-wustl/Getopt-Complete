@@ -105,11 +105,20 @@ sub import {
         # it's hard to spot the case in which the previous word is "boolean", and has no value specified
         if ($previous) {
             my ($name) = ($previous =~ /^-+(.*)/);
-            $name =~ s/^no-//;
             if ($OPT_SPEC{$name} and $OPT_SPEC{$name} =~ /[\!\+]/) {
                 push @other_options, $previous;
                 $previous = undef;
             }
+            elsif ($name =~ /no-(.*)/) {
+                # Handle a case of an option which natively starts with "--no-"
+                # and is set to boolean.  There is one of everything in this world. 
+                $name =~ s/^no-//;
+                if ($OPT_SPEC{$name} and $OPT_SPEC{$name} =~ /[\!\+]/) {
+                    push @other_options, $previous;
+                    $previous = undef;
+                }
+            }
+            
         }
         @ARGV = @other_options;
         local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
@@ -179,7 +188,7 @@ sub resolve_possible_completions {
             @possibilities = 
                 map { length($_) ? ('--' . $_) : ('-') } 
                 map {
-                    ($show_negative_booleans and $boolean{$_} )
+                    ($show_negative_booleans and $boolean{$_} and not substr($_,0,3) eq 'no-')
                         ? ($_, 'no-' . $_)
                         : $_
                 }
