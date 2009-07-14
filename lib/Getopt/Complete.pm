@@ -506,6 +506,10 @@ END {
 
 Getopt::Complete - custom programmable shell completion for Perl apps
 
+=head1 VERSION
+
+This document describes Getopt::Complete v0.4.
+
 =head1 SYNOPSIS
 
 In the Perl program "myprogram":
