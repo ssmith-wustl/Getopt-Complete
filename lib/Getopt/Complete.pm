@@ -224,22 +224,38 @@ sub resolve_possible_completions {
         }
     }
 
+    my $uncompletable_valid_possibilities = pop @possibilities if ref($possibilities[-1]);
+
+    # Determine which possibilities will actually match the current word
+    # The shell does this for us, but we need to do it to predict a few things
+    # and to adjust what we show the shell.
+    # This loop also determines which options should complete with a space afterward,
+    # and which options can be abbreviated when showing a list for the user.
     my @matches; 
     my @nospace;
+    my @abbreviated_matches;
     for my $p (@possibilities) {
         my $i =index($p,$current);
         if ($i == 0) {
-            my $last_char = substr($p,length($p)-1,1);
-            if ($last_char eq "\t") {
-                #print STDERR ">> nospace on $p\n";
-                ##print STDERR Data::Dumper->new([$p])->Useqq(1)->Dump;
-                push @matches, substr($p,0,length($p)-1);
-                $nospace[$#matches] = 1;
+            my $m;
+            if (substr($p,length($p)-1,1) eq "\t") {
+                # a partial match: no space at the end so the user can "drill down"
+                $m = substr($p,0,length($p)-1);
+                $nospace[$#matches+1] = 1;
             }
             else {
-                #print STDERR ">> space on $p\n";
-                push @matches, $p;
-                $nospace[$#matches] = 0;
+                $m = $p;
+                $nospace[$#matches+1] = 0;
+            }
+            if (substr($m,0,1) eq "\t") {
+                # abbreviatable...
+                my ($prefix,$abbreviation) = ($m =~ /^\t(.*)\t(.*)$/);
+                push @matches, $prefix . $abbreviation;
+                push @abbreviated_matches, $abbreviation;
+            }
+            else {
+                push @matches, $m;
+                push @abbreviated_matches, $m;
             }
         }
     }
@@ -250,13 +266,12 @@ sub resolve_possible_completions {
         if ($nospace[0]) {
             # We don't want a space, and there is no way to tell bash that, so we trick it.
             if ($matches[0] eq $current) {
-                # it IS done completing the word: return nothing so it doesn't stride forward with a space
-                # it will think it has a bad completion, effectively
+                # It IS done completing the word: return nothing so it doesn't stride forward with a space
+                # It will think it has a bad completion, effectively.
                 @matches = ();
             }
             else {
-                # it IS done completing the word: return nothing so it doesn't stride forward with a space
-                # it is NOT done completing the word
+                # It is NOT done completing the word.
                 # We return 2 items which start with the real value, but have an arbitrary ending.
                 # It will show everything but that ending, and then stop.
                 push @matches, $matches[0];
@@ -269,26 +284,49 @@ sub resolve_possible_completions {
         }
     }
     else {
-        # There are multiple matches.
-        # If all of them have a prefix in common, it will complete that much.
+        # There are multiple matches to the text already typed.
+        # If all of them have a prefix in common, the shell will complete that much.
         # If not, it will show a list.
-        # We may not want to show the complete text of each word, but a shortened version.
+        # We may not want to show the complete text of each word, but a shortened version,
         my $first_mismatch = eval {
             my $pos;
             no warnings;
             for ($pos=0; $pos < length($matches[0]); $pos++) {
                 my $expected = substr($matches[0],$pos,1);
                 for my $match (@matches[1..$#matches]) {  
-                    if (substr($match,$pos,0) ne $expected) {
+                    if (substr($match,$pos,1) ne $expected) {
                         return $pos;            
                     }
                 }
             }
             return $pos;
         };
-        if ($first_mismatch == 0) {
-            # no partial completion will occur, the shell will show a list now
-            # TODO: HERE IS WHERE WE ABBREVIATE THE MATCHES FOR DISPLAY
+        
+
+        my $current_length = length($current);
+        if ($first_mismatch == $current_length) {
+            # No partial completion will occur: the shell will show a list now.
+            # Attempt abbreviation of the displayed options:
+
+            my @matches = @abbreviated_matches;
+
+            #my $cut = $current;
+            #$cut =~ s/[^\/]+$//;
+            #my $cut_length = length($cut);
+            #my @matches =
+            #    map { substr($_,$cut_length) } 
+            #    @matches;
+
+            # If there are > 1 abbreviated items starting with the same character
+            # the shell won't realize they're abbreviated, and will do completion
+            # instead of listing options.  We force some variation into the list
+            # to prevent this.
+            my $first_c = substr($matches[0],0,1);
+            my @distinct_firstchar = grep { substr($_,0,1) ne $first_c } @matches[1,$#matches];
+            unless (@distinct_firstchar) {
+                # this puts an ugly space at the beginning of the completion set :(
+                push @matches,' '; 
+            }
         }
         else {
             # some partial completion will occur, continue passing the list so it can do that
@@ -340,7 +378,8 @@ sub invalid_options {
                 push @valid_values, @{ pop(@valid_values) };
             }
             unless (grep { $_ eq $value } map { /(.*)\t$/ ? $1 : $_ } @valid_values) {
-                my $msg = (($key || 'arguments') . " has invalid value $value.  Select from: " . join(", ", @valid_values) . "\n");
+                my $label = ($key eq '<>' ? "invalid argument $value." : "$key has invalid value $value."); 
+                my $msg = ($label  . ".  Select from: " . join(", ", map { /^(.+)\t$/ ? $1 : $_ } @valid_values) . "\n");
                 push @failed, $msg;
             }
         }
@@ -348,49 +387,15 @@ sub invalid_options {
     return @failed;
 }
 
-# Support the shell-builtiin completions.
-# Under development.  Replicating what the shell does w/ files and directories completely
-# seems impossible.  You must use -o default on the complete command to get zero-match options to complete.
-
-sub files {
-    my ($command,$value,$key,$opts) = @_;
-    $value ||= '';
-    my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -f '$value'"`; 
-    chomp @f;
-    if (@f == 1 and -d $f[0]) {
-        $f[0] .= "/\t"; 
-    }
-    if (-d $value) {
-        push @f, [$value];
-        push @{$f[-1]},'-' if $LONE_DASH_SUPPORT;
-    }
-    else {
-        push @f, ['-'] if $LONE_DASH_SUPPORT;
-    }
-    return \@f;
-}
-
-sub directories {
-    my ($command,$value,$key,$opts) = @_;
-    $value ||= '';
-    my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -d '$value'"`; 
-    chomp @f;
-    if (@f == 1 and -d $f[0]) {
-        $f[0] .= "/\t"; 
-    }
-    if (-d $value) {
-        push @f, [$value];
-    }
-    return \@f;
-}
-
-no warnings;
-*f = \&files;
-*d = \&directories;
-use warnings;
+# Support the shell-builtin completions.
+# Some hackery seems to be required to replicate regular file completion.
+# Case 1: you want to selectively not put a space after some options (incomplete directories)
+# Case 2: you want to show only part of the completion value (the last dir in a long path)
 
 # Manufacture the long and short sub-names on the fly.
 for my $subname (qw/
+    files
+    directories
     commands
     users
     groups
@@ -402,9 +407,21 @@ for my $subname (qw/
     my $option = substr($subname,0,1);
     my $code = sub {
         my ($command,$value,$key,$opts) = @_;
-        #[ map { chomp } grep { $_ !~/^\s+$/ } `bash -c "compgen -$option '$value'"` ], 
-        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option '$value'"`;
+        $value ||= '';
+        $value =~ s/\\/\\\\/;
+        $value =~ s/\'/\\'/;
+        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option -- '$value'"`; 
         chomp @f;
+        if ($option eq 'f' or $option eq 'd') {
+            @f = map { -d $_ ? "$_/\t" : $_ } @f;
+            if (-d $value) {
+                push @f, [$value];
+                push @{$f[-1]},'-' if $LONE_DASH_SUPPORT and $option eq 'f';
+            }
+            else {
+                push @f, ['-'] if $LONE_DASH_SUPPORT and $option eq 'f';
+            }
+        }
         return \@f;
     };
     no strict 'refs';
