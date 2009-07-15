@@ -1,6 +1,6 @@
 Revision history for Getopt-Complete
 
-0.4     2009-07-12
+0.4     2009-07-15
         Handle negative boolean flags (--no-*) iteratively.
         Handle other options with dashes in the name correctly.
         Switch to unpadded version numbers.
