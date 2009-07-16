@@ -65,8 +65,7 @@ package Getopt::Complete::Options;
 sub new {
     my $class = shift;
     my $self = bless {
-        option_spec_list => [],
-        option_spec_hash => {},
+        option_specs => {},
         completion_handlers => {},
         parse_errors => undef,
     }, $class;
@@ -84,14 +83,20 @@ sub option_names {
 
 sub option_specs { 
     Carp::confess("Bad params") if @_ > 1;
-    return @{ shift->{option_spec_list} } 
+    my $self = shift;
+    my @specs;
+    for my $key (keys %{ $self->{option_specs} }) {
+        my $value = $self->{option_specs}{$key};
+        push @specs, $key . $value;
+    }
+    return @specs;
 }
 
 sub option_spec {
     my $self = shift;
     my $name = shift;
     Carp::confess("Bad params") if not defined $name;
-    return $self->{option_spec_hash}{$name};
+    return $self->{option_specs}{$name};
 }
 
 sub completion_handler {
@@ -105,8 +110,7 @@ sub _init {
     my $self = shift;
     
     my $completion_handlers = $self->{completion_handlers} = {};
-    my $option_spec_list    = $self->{option_spec_list} = [];
-    my $option_spec_hash    = $self->{option_spec_hash} = {};
+    my $option_specs    = $self->{option_specs} = {};
 
     my @parse_errors;
     while (my $key = shift @_) {
@@ -150,8 +154,7 @@ sub _init {
             $spec ||= '!';
         }
         $spec ||= '=s';
-        push @$option_spec_list, $name . $spec;
-        $option_spec_hash->{$name} = $spec;
+        $option_specs->{$name} = $spec;
         if ($spec =~ /[\!\+]/ and defined $completion_handlers->{$key}) {
             push @parse_errors,  __PACKAGE__ . " error on option $key: ! and + expect an undef completion list, since they do not have values!";
             next;
