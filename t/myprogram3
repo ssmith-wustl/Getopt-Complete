@@ -60,19 +60,8 @@ use Getopt::Complete (
         ## 'no!' => ['this makes no sense, since a boolean flag doesn't complete'],
 );
 
-#if (my $o = $Getopt::Complete::ARGS) {
-#    %Getopt::Complete::COMPLETION_HANDLERS = %{ $o->{completion_handlers} };
-#    @Getopt::Complete::OPT_SPEC = @{ $o->{option_spec_list } };
-#}
+print "RUNNING OPTS:\n" . Dumper($ARGS) . Dumper(\%ARGS);
 
-#our %OPTS;
-#our $OPTS;
-#print "HANDLERS:\n" . Dumper(\%Getopt::Complete::COMPLETION_HANDLERS);
-#print "SPEC:\n" . Dumper(\%Getopt::Complete::OPT_SPEC);
-#print "RUNNING OPTS:\n" . Dumper($ARGS,\%OPTS);
-
-our $ARGS;
-print "RUNNING OPTS:\n" . Dumper($ARGS,\%ARGS);
 1;
 
 

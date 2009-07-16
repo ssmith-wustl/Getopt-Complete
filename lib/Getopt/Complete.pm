@@ -20,7 +20,7 @@ sub import {
     # Direct creation of objects is mostly for testing, and wrapper modules.
     
     # Make a single default Getopt::Complete::Options object,
-    # and then a single default Getopt::Complete::Results object.
+    # and then a single default Getopt::Complete::Args object.
 
     # Then make it available globally.
     
@@ -28,7 +28,7 @@ sub import {
     
     $options->handle_shell_completion();
 
-    $ARGS = Getopt::Complete::Results->new(
+    $ARGS = Getopt::Complete::Args->new(
         options => $options,
         argv => [@ARGV]
     );
@@ -170,7 +170,7 @@ sub handle_shell_completion {
     my $self = shift;
     if ($ENV{COMP_LINE}) {
         my ($command,$current,$previous,$other) = $self->parse_completion_request($ENV{COMP_LINE},$ENV{COMP_POINT});
-        my $args = Getopt::Complete::Results->new(options => $self, argv => $other);
+        my $args = Getopt::Complete::Args->new(options => $self, argv => $other);
         my @matches = $args->resolve_possible_completions($command,$current,$previous);
         print join("\n",@matches),"\n";
         exit;
@@ -216,53 +216,7 @@ sub parse_completion_request {
     return ($command,$current,$previous,\@other_options);
 }
 
-package Getopt::Complete::Compgen;
-
-# Support the shell-builtin completions.
-# Some hackery seems to be required to replicate regular file completion.
-# Case 1: you want to selectively not put a space after some options (incomplete directories)
-# Case 2: you want to show only part of the completion value (the last dir in a long path)
-
-# Manufacture the long and short sub-names on the fly.
-for my $subname (qw/
-    files
-    directories
-    commands
-    users
-    groups
-    environment
-    services
-    aliases
-    builtins
-/) {
-    my $option = substr($subname,0,1);
-    my $code = sub {
-        my ($command,$value,$key,$opts) = @_;
-        $value ||= '';
-        $value =~ s/\\/\\\\/;
-        $value =~ s/\'/\\'/;
-        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option -- '$value'"`; 
-        chomp @f;
-        if ($option eq 'f' or $option eq 'd') {
-            @f = map { -d $_ ? "$_/\t" : $_ } @f;
-            if (-d $value) {
-                push @f, [$value];
-                push @{$f[-1]},'-' if $LONE_DASH_SUPPORT and $option eq 'f';
-            }
-            else {
-                push @f, ['-'] if $LONE_DASH_SUPPORT and $option eq 'f';
-            }
-        }
-        return \@f;
-    };
-    no strict 'refs';
-    *$subname = $code;
-    *$option = $code;
-    *{ 'Getopt::Complete::' . $subname } = $code;
-    *{ 'Getopt::Complete::' . $option } = $code;
-}
-
-package Getopt::Complete::Results;
+package Getopt::Complete::Args;
 
 sub new {
     my $class = shift;
@@ -281,7 +235,7 @@ sub new {
         die "No options passed to " . __PACKAGE__ . " constructor!";
     }
     
-    $self->_process_argv();
+    $self->_init();
 
     return $self;
 }
@@ -302,14 +256,15 @@ sub options {
 sub option_value {
     my $self = shift;
     my $name = shift;
-    $self->{values}{$name}
+    my $value = $self->{'values'}{$name};
+    return $value;
 }
 
 sub errors {
     @{ shift->{errors} }
 }
 
-sub _process_argv {
+sub _init {
     my $self = shift; 
     
     local @ARGV = @{ $self->{argv} };
@@ -337,11 +292,12 @@ sub _process_argv {
         }
     }
 
+    %{ $self->{'values'} } = %values;
+    
     if (my @more_errors = $self->_validate_values()) {
         push @errors, @more_errors;
     }
 
-    %{ $self->{'values'} } = %values;
     @{ $self->{'errors'} } = @errors;
 
     return (@errors ? () : 1);
@@ -350,6 +306,7 @@ sub _process_argv {
 
 sub _validate_values {
     my $self = shift;
+
     my @failed;
     for my $key (keys %{ $self->options->{completion_handlers} }) {
         my $completions = $self->options->completion_handler($key);
@@ -370,6 +327,7 @@ sub _validate_values {
 
         my $value_returned = $self->option_value($name);
         my @values = (ref($value_returned) ? @$value_returned : $value_returned);
+        
         my $all_valid_values;
         for my $value (@values) {
             next if not defined $value;
@@ -572,6 +530,53 @@ sub resolve_possible_completions {
 
     return @matches;
 }
+
+package Getopt::Complete::Compgen;
+
+# Support the shell-builtin completions.
+# Some hackery seems to be required to replicate regular file completion.
+# Case 1: you want to selectively not put a space after some options (incomplete directories)
+# Case 2: you want to show only part of the completion value (the last dir in a long path)
+
+# Manufacture the long and short sub-names on the fly.
+for my $subname (qw/
+    files
+    directories
+    commands
+    users
+    groups
+    environment
+    services
+    aliases
+    builtins
+/) {
+    my $option = substr($subname,0,1);
+    my $code = sub {
+        my ($command,$value,$key,$opts) = @_;
+        $value ||= '';
+        $value =~ s/\\/\\\\/;
+        $value =~ s/\'/\\'/;
+        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option -- '$value'"`; 
+        chomp @f;
+        if ($option eq 'f' or $option eq 'd') {
+            @f = map { -d $_ ? "$_/\t" : $_ } @f;
+            if (-d $value) {
+                push @f, [$value];
+                push @{$f[-1]},'-' if $LONE_DASH_SUPPORT and $option eq 'f';
+            }
+            else {
+                push @f, ['-'] if $LONE_DASH_SUPPORT and $option eq 'f';
+            }
+        }
+        return \@f;
+    };
+    no strict 'refs';
+    *$subname = $code;
+    *$option = $code;
+    *{ 'Getopt::Complete::' . $subname } = $code;
+    *{ 'Getopt::Complete::' . $option } = $code;
+}
+
 1;
 
 =pod 
@@ -594,10 +599,11 @@ In the Perl program "myprogram":
       'quiet!'      => undef,
       'name'        => undef,
       'age=n'       => undef,
-      'output'      => \&Getopt::Complete::files, 
-      'runthis'     => \&Getopt::Complete::commands, 
-      '<>'          => \&Getopt::Complete::directories, 
+      'output'      => \&Getopt::Complete::Compgen::files, 
+      'runthis'     => \&Getopt::Complete::Compgen::commands, 
+      '<>'          => \&Getopt::Complete::Compgen::directories, 
   );
+
   print "the frog says " . $ARGS{frog} . "\n";
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
@@ -636,7 +642,8 @@ are welcome.
 
 Getopt::Complete processes the command-line options at compile time.
 
-The results are avaialble in an %ARGS hash:
+The results are avaialble in an %ARGS hash, which is intended as a companion
+to the @ARGV array generated natively by Perl.
 
   use Getopt::Complete (
     'mydir'     => 'd',
@@ -655,11 +662,34 @@ match their own completion list, and will otherwise add additional errors
 explaining the problem.
 
 The %ARGS hash is an alias for %Getopt::Complete::ARGS.  The alias is not created 
-in the caller's namespaces if a hash named %ARGS already exists with data.
+in the caller's namespaces if a hash named %ARGS already exists with data, but
+the results are always available from %Getopt::Complete::ARGS.
 
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
 See OVERRIDING PROCESSING DEFAULTS below for details.
+
+=head1 OBJECT API AND REFLECTION
+
+In the same namespace(s) as the %ARGS hash is an object $ARGS, which provides
+an OO interface to the current arguments, the options behind them, possible 
+completions, etc.
+
+See the following for details on thse APIs:
+
+ L<Getopt::Complete::Options>    # the object describing the options available for the app
+ 
+ L<Getopt::Complete::Args>       # references the above, and represents the post-proceseded @ARGV
+ 
+ L<Getopt::Complete::Builtins>   # a wrapper for the bash "compgen" builtin, used by bash's "complete" builtin
+
+These objects are also directly constructable for custom options processing solutions.
+
+  my $opts = Getopt::Complete::Options->new("foo=s" => 'f', "bar=s" => [qw/a b c/]);
+  my $args = Getopt::Complete::Args->new(options => $opts, argv => \@ARGV);
+  for my $option_name ($args->option_names) {
+    print $option_name . ' has value ' . $arg->option_value($option_name),"\n"
+  }
 
 =head1 PROGRAMMABLE COMPLETION BACKGROUND
 
