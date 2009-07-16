@@ -42,6 +42,7 @@ sub import {
     }
 
     *ARGS = \%{ $ARGS->{values} };
+    
     do {
         no strict 'refs';
         my $pkg = caller();
@@ -60,12 +61,10 @@ sub import {
 
 package Getopt::Complete::Options;
 
-use Getopt::Long;
 
 sub new {
     my $class = shift;
     my $self = bless {
-        # from process_completion_handlers() 
         option_spec_list => [],
         option_spec_hash => {},
         completion_handlers => {},
@@ -84,20 +83,21 @@ sub option_names {
 }
 
 sub option_specs { 
+    Carp::confess("Bad params") if @_ > 1;
     return @{ shift->{option_spec_list} } 
 }
 
 sub option_spec {
     my $self = shift;
     my $name = shift;
-    Carp::confess() if not defined $name;
+    Carp::confess("Bad params") if not defined $name;
     return $self->{option_spec_hash}{$name};
 }
 
 sub completion_handler {
     my $self = shift;
     my $name = shift;
-    Carp::confess() if not defined $name;
+    Carp::confess("Bad params") if not defined $name;
     return $self->{completion_handlers}{$name};
 }
 
@@ -218,6 +218,9 @@ sub parse_completion_request {
 
 package Getopt::Complete::Args;
 
+use Getopt::Long;
+use Scalar::Util;
+
 sub new {
     my $class = shift;
     my $self = bless {
@@ -231,16 +234,39 @@ sub new {
     unless ($self->{argv}) {
         die "No argv passed to " . __PACKAGE__ . " constructor!";
     }
-    unless ($self->{options}) {
+   
+    my $options = $self->{options};
+
+    unless ($options) {
         die "No options passed to " . __PACKAGE__ . " constructor!";
     }
+
+    my $type = ref($options);
+    if (not $type) {
+        die "Expected Getopt::Complete::Options, or a constructor ARRAY/HASH for ''options''.  Got: $type $options.";
+    }
+    elsif ($type eq 'ARRAY') {
+        $self->{options} = Getopt::Complete::Options(@$options);
+    }
+    elsif ($type eq 'HASH') {
+        $self->{options} = Getopt::Complete::Options(%$options);
+    }
+    elsif (Scalar::Util::blessed($options)) {
+        if (not $options->isa("Getopt::Complete::Options")) {
+            die "Expected Getopt::Complete::Options, or a constructor ARRAY/HASH for ''options''.  Got: $options.";
+        }
+    }
+    else {
+        die "Expected Getopt::Complete::Options, or a constructor ARRAY/HASH for ''options''.  Got reference $options.";
+    }
+
     
     $self->_init();
 
     return $self;
 }
 
-for my $method (qw/option_names option_specs completion_handler/) {
+for my $method (qw/option_names option_specs option_spec completion_handler/) {
     no strict 'refs';
     *{$method} = sub {
         my $self = shift;
@@ -378,7 +404,7 @@ sub resolve_possible_completions {
             # We only show the negative version of boolean options 
             # when the user already has "--no-" on the line.
             # Otherwise, we just include --no- as a possible (partial) completion
-            my %boolean = map { $_ => 1 } grep { $self->option_specs($_) =~ /\!/ } grep { $_ ne '<>' }  @args;
+            my %boolean = map { $_ => 1 } grep { $self->option_spec($_) =~ /\!/ } grep { $_ ne '<>' }  @args;
             my $show_negative_booleans = ($current =~ /^--no-/ ? 1 : 0);
             @possibilities = 
                 map { length($_) ? ('--' . $_) : ('-') } 
