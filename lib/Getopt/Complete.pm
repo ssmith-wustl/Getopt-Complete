@@ -6,168 +6,405 @@ use warnings;
 use version;
 our $VERSION = qv('0.5');
 
-use Getopt::Long;
-
-our %COMPLETION_HANDLERS;
-our @OPT_SPEC;
-our %OPT_SPEC;
-
-our %OPTS;
-
-our $NO_EXIT_ON_ERRORS;
-our $OPTS_OK;
-our @ERRORS;
+our $ARGS;
+our %ARGS;
 
 our $LONE_DASH_SUPPORT = 1;
 
 sub import {    
     my $class = shift;
+    return unless @_;
 
-    # Install an alias to %Getopt::Complete::OPTS in the caller's namespace
+    # The safe way to use this module is to specify args at compile time.  
+    # This allows 'perl -c' to handle shell-completion requests.
+    # Direct creation of objects is mostly for testing, and wrapper modules.
+    
+    # Make a single default Getopt::Complete::Options object,
+    # and then a single default Getopt::Complete::Results object.
+
+    # Then make it available globally.
+    
+    my $options = Getopt::Complete::Options->new(@_);
+    
+    $options->handle_shell_completion();
+
+    $ARGS = Getopt::Complete::Results->new(
+        options => $options,
+        argv => [@ARGV]
+    );
+    
+    if (my @errors = $ARGS->errors) {
+        for my $error ($ARGS->errors) {
+            chomp $error;
+            warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+        }
+        exit 1;
+    }
+
+    *ARGS = \%{ $ARGS->{values} };
     do {
         no strict 'refs';
         my $pkg = caller();
-        my $v = \%{ $pkg . "::OPTS" };
+        my $v;
+        $v = ${ $pkg . "::ARGS" };
+        unless (defined $v) {
+            *{ $pkg . "::ARGS" } = \$ARGS;
+        }
+        $v = \%{ $pkg . "::ARGS" };
         unless (keys %$v) {
-            *{ $pkg . "::OPTS" } = \%OPTS;
+            *{ $pkg . "::ARGS" } = \%ARGS;
         }
     };
+}
 
-    # Parse out the options and completions specification. 
-    %COMPLETION_HANDLERS = (@_);
-    my $bare_args = 0;
-    my $parse_errors;
-    for my $key (sort keys %COMPLETION_HANDLERS) {
+
+package Getopt::Complete::Options;
+
+use Getopt::Long;
+
+sub new {
+    my $class = shift;
+    my $self = bless {
+        # from process_completion_handlers() 
+        option_spec_list => [],
+        option_spec_hash => {},
+        completion_handlers => {},
+        parse_errors => undef,
+    }, $class;
+
+    # process the params into normalized completion handlers
+    # if there are problems, the ->errors method will return a list.
+    $self->_init(@_);
+
+    return $self;
+}
+
+sub option_names {
+    return keys %{ shift->{completion_handlers} };
+}
+
+sub option_specs { 
+    return @{ shift->{option_spec_list} } 
+}
+
+sub option_spec {
+    my $self = shift;
+    my $name = shift;
+    Carp::confess() if not defined $name;
+    return $self->{option_spec_hash}{$name};
+}
+
+sub completion_handler {
+    my $self = shift;
+    my $name = shift;
+    Carp::confess() if not defined $name;
+    return $self->{completion_handlers}{$name};
+}
+
+sub _init {
+    my $self = shift;
+    
+    my $completion_handlers = $self->{completion_handlers} = {};
+    my $option_spec_list    = $self->{option_spec_list} = [];
+    my $option_spec_hash    = $self->{option_spec_hash} = {};
+
+    my @parse_errors;
+    while (my $key = shift @_) {
+        my $handler = shift @_;
+        
         my ($name,$spec) = ($key =~ /^([\w|-]+|\<\>|)(\W.*|)/);
         if (not defined $name) {
-            print STDERR __PACKAGE__ . " is unable to parse '$key' from spec!";
-            $parse_errors++;
+            push @parse_errors,  __PACKAGE__ . " is unable to parse '$key' from spec!";
             next;
         }
-        my $handler = delete $COMPLETION_HANDLERS{$key};
         if ($handler and not ref $handler) {
             my $code;
-            eval {
-                $code = \&{ $handler };
-            };
-            unless (ref($code)) {
-                print STDERR __PACKAGE__ . " $key! references callback $handler which is not found!  Did you use its module first?!";
-                $parse_errors++;
+            if ($handler =~ /::/) {
+                # fully qualified
+                eval {
+                    $code = \&{ $handler };
+                };
+                unless (ref($code)) {
+                    push @parse_errors,  __PACKAGE__ . " $key! references callback $handler which is not found!  Did you use its module first?!";
+                }
             }
-            $handler = $code;
+            else {
+                $code = Getopt::Complete::Compgen->can($handler);
+                unless (ref($code)) {
+                    push @parse_errors,  __PACKAGE__ . " $key! references builtin $handler which is not found!  Select from:"
+                        . join(", ", map { my $short = substr($_,0,1); "$_($short)"  } @Getopt::Complete::Compgen::builtins);
+                }
+            }
+            if (ref($code)){
+                $handler = $code;
+            }
         }
-        $COMPLETION_HANDLERS{$name} = $handler;
+        $completion_handlers->{$name} = $handler;
         if ($name eq '<>') {
-            $bare_args = 1;
             next;
         }
         if ($name eq '-') {
             if ($spec and $spec ne '!') {
-                print STDERR __PACKAGE__ . " $key errors: $name is implicitly boolean!";
-                $parse_errors++;
+                push @parse_errors,  __PACKAGE__ . " $key errors: $name is implicitly boolean!";
             }
             $spec ||= '!';
         }
         $spec ||= '=s';
-        push @OPT_SPEC, $name . $spec;
-        $OPT_SPEC{$name} = $spec;
-        if ($spec =~ /[\!\+]/ and defined $COMPLETION_HANDLERS{$key}) {
-            print STDERR __PACKAGE__ . " error on option $key: ! and + expect an undef completion list, since they do not have values!";
-            $parse_errors++;
+        push @$option_spec_list, $name . $spec;
+        $option_spec_hash->{$name} = $spec;
+        if ($spec =~ /[\!\+]/ and defined $completion_handlers->{$key}) {
+            push @parse_errors,  __PACKAGE__ . " error on option $key: ! and + expect an undef completion list, since they do not have values!";
             next;
         }
-        if (ref($COMPLETION_HANDLERS{$key}) eq 'ARRAY' and @{ $COMPLETION_HANDLERS{$key} } == 0) {
-            print STDERR __PACKAGE__ . " error on option $key: an empty arrayref will never be valid!";
-            $parse_errors++;
+        if (ref($completion_handlers->{$key}) eq 'ARRAY' and @{ $completion_handlers->{$key} } == 0) {
+            push @parse_errors,  __PACKAGE__ . " error on option $key: an empty arrayref will never be valid!";
         }
     }
+    
+    $self->{parse_errors} = \@parse_errors;
+   
+    return (@parse_errors ? () : 1);
+}
 
-    # If here are errors, we exit now.
-    if ($parse_errors) {
-        exit 1;
-    }
-
-    # Check whether we're "really" running, or have been run by the shell
-    # to do word completion.
+sub handle_shell_completion {
+    my $self = shift;
     if ($ENV{COMP_LINE}) {
-        # This command has been set to autocomplete via "completeF".
-        my $left = substr($ENV{COMP_LINE},0,$ENV{COMP_POINT});
-        my $current = '';
-        if ($left =~ /([^\=\s]+)$/) {
-            $current = $1;
-            $left = substr($left,0,length($left)-length($current));
-        }
-        $left =~ s/\s+$//;
-
-        my @other_options = split(/\s+/,$left);
-        my $command = $other_options[0];
-        my $previous = pop @other_options if $other_options[-1] =~ /^--/;
-        # it's hard to spot the case in which the previous word is "boolean", and has no value specified
-        if ($previous) {
-            my ($name) = ($previous =~ /^-+(.*)/);
-            if ($OPT_SPEC{$name} and $OPT_SPEC{$name} =~ /[\!\+]/) {
-                push @other_options, $previous;
-                $previous = undef;
-            }
-            elsif ($name =~ /no-(.*)/) {
-                # Handle a case of an option which natively starts with "--no-"
-                # and is set to boolean.  There is one of everything in this world. 
-                $name =~ s/^no-//;
-                if ($OPT_SPEC{$name} and $OPT_SPEC{$name} =~ /[\!\+]/) {
-                    push @other_options, $previous;
-                    $previous = undef;
-                }
-            }
-            
-        }
-        @ARGV = @other_options;
-        local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
-        $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
-        @Getopt::Complete::ERRORS = invalid_options();
-        $Getopt::Complete::OPTS_OK = 0 if $Getopt::Complete::ERRORS;
-        #print STDERR Data::Dumper::Dumper([$command,$current,$previous,\@other_options]);
-        my @matches = $class->resolve_possible_completions($command,$current,$previous,\@other_options);
+        my ($command,$current,$previous,$other) = $self->parse_completion_request($ENV{COMP_LINE},$ENV{COMP_POINT});
+        my $args = Getopt::Complete::Results->new(options => $self, argv => $other);
+        my @matches = $args->resolve_possible_completions($command,$current,$previous);
         print join("\n",@matches),"\n";
         exit;
     }
-    else {
-        # Normal execution of the program.
-        # Process the command-line options and store the results.  
-        my @orig_argv = @ARGV;
-        do {
-            local $SIG{__WARN__} = sub { push @Getopt::Complete::ERRORS, @_ };
-            $Getopt::Complete::OPTS_OK = Getopt::Long::GetOptions(\%OPTS,@OPT_SPEC);
-        };
-        if (@ARGV) {
-            if ($bare_args) {
-                my $a = $Getopt::Complete::OPTS{'<>'} ||= [];
-                push @$a, @ARGV;
+    return 1;
+}
+
+sub parse_completion_request {
+    my $self = shift;
+
+    # This command has been set to autocomplete via "completeF".
+    my $left = substr($ENV{COMP_LINE},0,$ENV{COMP_POINT});
+    my $current = '';
+    if ($left =~ /([^\=\s]+)$/) {
+        $current = $1;
+        $left = substr($left,0,length($left)-length($current));
+    }
+    $left =~ s/\s+$//;
+
+    my @other_options = split(/\s+/,$left);
+    my $command = $other_options[0];
+    my $previous = pop @other_options if $other_options[-1] =~ /^--/;
+    # it's hard to spot the case in which the previous word is "boolean", and has no value specified
+    if ($previous) {
+        my ($name) = ($previous =~ /^-+(.*)/);
+        my $spec = $self->option_spec($name);
+        if ($spec and $spec =~ /[\!\+]/) {
+            push @other_options, $previous;
+            $previous = undef;
+        }
+        elsif ($name =~ /no-(.*)/) {
+            # Handle a case of an option which natively starts with "--no-"
+            # and is set to boolean.  There is one of everything in this world. 
+            $name =~ s/^no-//;
+            $spec = $self->option_spec($name);
+            if ($spec and $spec =~ /[\!\+]/) {
+                push @other_options, $previous;
+                $previous = undef;
+            }
+        }
+        
+    }
+    return ($command,$current,$previous,\@other_options);
+}
+
+package Getopt::Complete::Compgen;
+
+# Support the shell-builtin completions.
+# Some hackery seems to be required to replicate regular file completion.
+# Case 1: you want to selectively not put a space after some options (incomplete directories)
+# Case 2: you want to show only part of the completion value (the last dir in a long path)
+
+# Manufacture the long and short sub-names on the fly.
+for my $subname (qw/
+    files
+    directories
+    commands
+    users
+    groups
+    environment
+    services
+    aliases
+    builtins
+/) {
+    my $option = substr($subname,0,1);
+    my $code = sub {
+        my ($command,$value,$key,$opts) = @_;
+        $value ||= '';
+        $value =~ s/\\/\\\\/;
+        $value =~ s/\'/\\'/;
+        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option -- '$value'"`; 
+        chomp @f;
+        if ($option eq 'f' or $option eq 'd') {
+            @f = map { -d $_ ? "$_/\t" : $_ } @f;
+            if (-d $value) {
+                push @f, [$value];
+                push @{$f[-1]},'-' if $LONE_DASH_SUPPORT and $option eq 'f';
             }
             else {
-                $Getopt::Complete::OPTS_OK = 0;
-                for my $arg (@ARGV) {
-                    push @Getopt::Complete::ERRORS, "unexpected unnamed arguments: $arg";
-                }
+                push @f, ['-'] if $LONE_DASH_SUPPORT and $option eq 'f';
             }
         }
-        if (my @more_errors = invalid_options()) {
-            $Getopt::Complete::OPTS_OK = 0;
-            push @Getopt::Complete::ERRORS, @more_errors;
-        }
-        if (@ERRORS) {
-            for my $error (@ERRORS) {
-                chomp $error;
-                warn __PACKAGE__ . ' ERROR:' . $error . "\n";
-            }
-            exit 1;
-        }
-        # RESTORE ARGV!  In case the developer doesn't want to use our processed options...
-        @ARGV = @orig_argv;
+        return \@f;
+    };
+    no strict 'refs';
+    *$subname = $code;
+    *$option = $code;
+    *{ 'Getopt::Complete::' . $subname } = $code;
+    *{ 'Getopt::Complete::' . $option } = $code;
+}
+
+package Getopt::Complete::Results;
+
+sub new {
+    my $class = shift;
+    my $self = bless {
+        'options' => undef,
+        'values' => {},
+        'errors' => [],
+        'argv' => undef,
+        @_,
+    }, $class;
+
+    unless ($self->{argv}) {
+        die "No argv passed to " . __PACKAGE__ . " constructor!";
+    }
+    unless ($self->{options}) {
+        die "No options passed to " . __PACKAGE__ . " constructor!";
+    }
+    
+    $self->_process_argv();
+
+    return $self;
+}
+
+for my $method (qw/option_names option_specs completion_handler/) {
+    no strict 'refs';
+    *{$method} = sub {
+        my $self = shift;
+        my $options = $self->options;
+        return $options->$method(@_);
     }
 }
 
+sub options {
+    shift->{options};
+}
+
+sub option_value {
+    my $self = shift;
+    my $name = shift;
+    $self->{values}{$name}
+}
+
+sub errors {
+    @{ shift->{errors} }
+}
+
+sub _process_argv {
+    my $self = shift; 
+    
+    local @ARGV = @{ $self->{argv} };
+    
+    my %values;
+    my @errors;
+
+    do {
+        local $SIG{__WARN__} = sub { push @errors, @_ };
+        my $retval = Getopt::Long::GetOptions(\%values,$self->options->option_specs);
+        if (!$retval and @errors == 0) {
+            push @errors, "unknown error processing arguments!";
+        }
+    };
+
+    if (@ARGV) {
+        if ($self->options->completion_handler('<>')) {
+            my $a = $values{'<>'} ||= [];
+            push @$a, @ARGV;
+        }
+        else {
+            for my $arg (@ARGV) {
+                push @errors, "unexpected unnamed arguments: $arg";
+            }
+        }
+    }
+
+    if (my @more_errors = $self->_validate_values()) {
+        push @errors, @more_errors;
+    }
+
+    %{ $self->{'values'} } = %values;
+    @{ $self->{'errors'} } = @errors;
+
+    return (@errors ? () : 1);
+}
+
+
+sub _validate_values {
+    my $self = shift;
+    my @failed;
+    for my $key (keys %{ $self->options->{completion_handlers} }) {
+        my $completions = $self->options->completion_handler($key);
+
+        my ($dashes,$name,$spec);
+        if ($key eq '<>') {
+            $name = '<>',
+            $spec = '=s@';
+        }
+        else {
+            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]+|\<\>|)(\W.*|)/);
+            #($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
+            if (not defined $name) {
+                print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
+                next;
+            }
+        }
+
+        my $value_returned = $self->option_value($name);
+        my @values = (ref($value_returned) ? @$value_returned : $value_returned);
+        my $all_valid_values;
+        for my $value (@values) {
+            next if not defined $value;
+            next if not defined $completions;
+            if (ref($completions) eq 'CODE') {
+                # we pass in the value as the "completeme" word, so that the callback
+                # can be as optimal as possible in determining if that value is acceptable.
+                $completions = $completions->(undef,$value,$key,$self);
+                if (not defined $completions or not ref($completions) eq 'ARRAY' or @$completions == 0) {
+                    # if not, we give it the chance to give us the full list of options
+                    $completions = $self->completion_handler($key)->(undef,undef,$key,{});
+                }
+            }
+            unless (ref($completions) eq 'ARRAY') {
+                warn "unexpected completion specification for $key: $completions???";
+                next;
+            }
+            my @valid_values = @$completions;
+            if (ref($valid_values[-1]) eq 'ARRAY') {
+                push @valid_values, @{ pop(@valid_values) };
+            }
+            unless (grep { $_ eq $value } map { /(.*)\t$/ ? $1 : $_ } @valid_values) {
+                my $label = ($key eq '<>' ? "invalid argument $value." : "$key has invalid value $value."); 
+                my $msg = ($label  . ".  Select from: " . join(", ", map { /^(.+)\t$/ ? $1 : $_ } @valid_values) . "\n");
+                push @failed, $msg;
+            }
+        }
+    }
+    return @failed;
+}
+
 sub resolve_possible_completions {
-    my ($self,$command, $current, $previous, $all) = @_;
+    my ($self, $command, $current, $previous) = @_;
+
+    my $all = $self->{values};
 
     $previous = '' if not defined $previous;
 
@@ -178,12 +415,12 @@ sub resolve_possible_completions {
         # an unqalified argument, or an option name
         if ($current =~ /^(-+)/) {
             # the incomplete word is an option name
-            my @args = keys %COMPLETION_HANDLERS;
+            my @args = $self->option_names;
             
             # We only show the negative version of boolean options 
             # when the user already has "--no-" on the line.
             # Otherwise, we just include --no- as a possible (partial) completion
-            my %boolean = map { $_ => 1 } grep { $OPT_SPEC{$_} =~ /\!/ } @args;
+            my %boolean = map { $_ => 1 } grep { $self->option_specs($_) =~ /\!/ } grep { $_ ne '<>' }  @args;
             my $show_negative_booleans = ($current =~ /^--no-/ ? 1 : 0);
             @possibilities = 
                 map { length($_) ? ('--' . $_) : ('-') } 
@@ -207,10 +444,10 @@ sub resolve_possible_completions {
 
     if ($resolve_values_for_option_name) {
         # either a value for a named option, or a bare argument.
-        if (my $handler = $COMPLETION_HANDLERS{$resolve_values_for_option_name}) {
+        if (my $handler = $self->completion_handler($resolve_values_for_option_name)) {
             # the incomplete word is a value for some option (possible the option '<>' for bare args)
             if (defined($handler) and not ref($handler) eq 'ARRAY') {
-                $handler = $handler->($command,$current,$previous,\%Getopt::Complete::OPTS);
+                $handler = $handler->($command,$current,$previous,$all);
             }
             unless (ref($handler) eq 'ARRAY') {
                 die "values for $previous must be an arrayref! got $handler\n";
@@ -304,7 +541,7 @@ sub resolve_possible_completions {
         
 
         my $current_length = length($current);
-        if ($first_mismatch == $current_length) {
+        if (@matches and ($first_mismatch == $current_length)) {
             # No partial completion will occur: the shell will show a list now.
             # Attempt abbreviation of the displayed options:
 
@@ -335,195 +572,6 @@ sub resolve_possible_completions {
 
     return @matches;
 }
-
-sub invalid_options {
-    my @failed;
-    for my $key (sort keys %COMPLETION_HANDLERS) {
-        my $completions = $COMPLETION_HANDLERS{$key};
-        
-        my ($dashes,$name,$spec);
-        if ($key eq '<>') {
-            $name = '<>',
-            $spec = '=s@';
-        }
-        else {
-            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]+|\<\>|)(\W.*|)/);
-            #($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
-            if (not defined $name) {
-                print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
-                next;
-            }
-        }
-
-        my @values = (ref($OPTS{$name}) ? @{ $OPTS{$name} } : $OPTS{$name});
-        my $all_valid_values;
-        for my $value (@values) {
-            next if not defined $value;
-            next if not defined $completions;
-            if (ref($completions) eq 'CODE') {
-                # we pass in the value as the "completeme" word, so that the callback
-                # can be as optimal as possible in determining if that value is acceptable.
-                $completions = $completions->(undef,$value,$key,\%OPTS);
-                if (not defined $completions or not ref($completions) eq 'ARRAY' or @$completions == 0) {
-                    # if not, we give it the chance to give us the full list of options
-                    $completions = $COMPLETION_HANDLERS{$key}->(undef,undef,$key);
-                }
-            }
-            unless (ref($completions) eq 'ARRAY') {
-                warn "unexpected completion specification for $key: $completions???";
-                next;
-            }
-            my @valid_values = @$completions;
-            if (ref($valid_values[-1]) eq 'ARRAY') {
-                push @valid_values, @{ pop(@valid_values) };
-            }
-            unless (grep { $_ eq $value } map { /(.*)\t$/ ? $1 : $_ } @valid_values) {
-                my $label = ($key eq '<>' ? "invalid argument $value." : "$key has invalid value $value."); 
-                my $msg = ($label  . ".  Select from: " . join(", ", map { /^(.+)\t$/ ? $1 : $_ } @valid_values) . "\n");
-                push @failed, $msg;
-            }
-        }
-    }
-    return @failed;
-}
-
-# Support the shell-builtin completions.
-# Some hackery seems to be required to replicate regular file completion.
-# Case 1: you want to selectively not put a space after some options (incomplete directories)
-# Case 2: you want to show only part of the completion value (the last dir in a long path)
-
-# Manufacture the long and short sub-names on the fly.
-for my $subname (qw/
-    files
-    directories
-    commands
-    users
-    groups
-    environment
-    services
-    aliases
-    builtins
-/) {
-    my $option = substr($subname,0,1);
-    my $code = sub {
-        my ($command,$value,$key,$opts) = @_;
-        $value ||= '';
-        $value =~ s/\\/\\\\/;
-        $value =~ s/\'/\\'/;
-        my @f =  grep { $_ !~/^\s+$/ } `bash -c "compgen -$option -- '$value'"`; 
-        chomp @f;
-        if ($option eq 'f' or $option eq 'd') {
-            @f = map { -d $_ ? "$_/\t" : $_ } @f;
-            if (-d $value) {
-                push @f, [$value];
-                push @{$f[-1]},'-' if $LONE_DASH_SUPPORT and $option eq 'f';
-            }
-            else {
-                push @f, ['-'] if $LONE_DASH_SUPPORT and $option eq 'f';
-            }
-        }
-        return \@f;
-    };
-    no strict 'refs';
-    *$subname = $code;
-    *$option = $code;
-}
-
-# Under development...
-sub update_bashrc {
-    use File::Basename;
-    use IO::File;
-    my $me = basename($0);
-
-    my $found = 0;
-    my $added = 0;
-    if ($ENV{GETOPT_COMPLETE_APPS}) {
-        my @apps = split('\s+',$ENV{GETOPT_COMPLETE_APPS});
-        for my $app (@apps) {
-            if ($app eq $me) {
-                # already in the list
-                return;
-            }
-        }
-    }
-
-    # we're not on the list: try to update .bashrc
-    my $bashrc = "$ENV{HOME}/.bashrc";
-    if (-e $bashrc) {
-        my $bashrc_fh = IO::File->new($bashrc);
-        unless ($bashrc_fh) {
-            die "Failed to open $bashrc to add tab-completion for $me!\n";
-        } 
-        my @lines = $bashrc_fh->getlines();
-        $bashrc_fh->close;
-        
-        for my $line (@lines) {
-            if ($line =~ /^\s*export GETOPT_COMPLETE_APPS=/) {
-                if (index($line,$me) == -1) {
-                    $line =~ s/\"\s*$//;
-                    $line .= ' ' . $me . '"' .  "\n";
-                    $added++;
-                }
-                else {
-                    $found++;
-                }
-            }
-        }
-
-        if ($added) {
-            # append to the existing apps variable
-            $bashrc_fh = IO::File->new(">$bashrc");
-            unless ($bashrc_fh) {
-                die "Failed to open $bashrc to add tab-completion for $me!\n";
-            }
-            $bashrc_fh->print(@lines);
-            $bashrc_fh->close;
-            return 1;
-        }
-
-        if ($found) {
-            print STDERR "WARNING: Run this now to activate tab-completion: source ~/.bashrc\n";
-            print STDERR "WARNING: This will occur automatically for subsequent logins.\n";
-            return;
-        }
-    }
-
-    # append a block of logic to the bashrc
-    my $bash_src = <<EOS;
-    # Added by the Getopt::Complete Perl module
-    export GETOPT_COMPLETE_APPS="\$GETOPT_COMPLETE_APPS $me"
-    for app in \$GETOPT_COMPLETE_APPS; do
-        complete -C GETOPT_COMPLETE=bash\\ \$app \$app
-    done
-EOS
-    my $bashrc_fh = IO::File->new(">>$bashrc");
-    unless ($bashrc_fh) {
-        die "Failed to open .bashrc: $!\n";
-    }
-    while ($bash_src =~ s/^ {4}//m) {}
-    $bashrc_fh->print($bash_src);
-    $bashrc_fh->close;
-
-    return 1;
-}
-
-# At exit, ensure that command-completion is configured in bashrc for bash users.
-# It's easier to do for the user than to explain.
-
-END {
-    # DISABLED!
-    if (0 and $ENV{SHELL} =~ /\wbash$/) {
-        if (eval { update_bashrc() }) {
-            print STDERR "WARNING: Added command-line tab-completion to $ENV{HOME}/.bashrc.\n";
-            print STDERR "WARNING: Run this now to activate tab-completion: source ~/.bashrc\n";
-            print STDERR "WARNING: This will occur automatically for subsequent logins.\n";
-        }
-        if ($@) {
-            warn "WARNING: failed to extend .bashrc to handle tab-completion! $@";
-        }
-    }
-}
-
 1;
 
 =pod 
@@ -550,7 +598,7 @@ In the Perl program "myprogram":
       'runthis'     => \&Getopt::Complete::commands, 
       '<>'          => \&Getopt::Complete::directories, 
   );
-  print "the frog says " . $OPTS{frog} . "\n";
+  print "the frog says " . $ARGS{frog} . "\n";
 
 In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
@@ -588,7 +636,7 @@ are welcome.
 
 Getopt::Complete processes the command-line options at compile time.
 
-The results are avaialble in an %OPTS hash:
+The results are avaialble in an %ARGS hash:
 
   use Getopt::Complete (
     'mydir'     => 'd',
@@ -596,8 +644,8 @@ The results are avaialble in an %OPTS hash:
     '<>'        =  ['monkey', 'taco', 'banana']
   );
 
-  for $opt (keys %OPTS) {
-    $val = $OPTS{$opt};
+  for $opt (keys %ARGS) {
+    $val = $ARGS{$opt};
     print "$opt has value $val\n";
   }
 
@@ -606,8 +654,8 @@ program to exit during "use".  Getopt::Complete verifies that the option values 
 match their own completion list, and will otherwise add additional errors
 explaining the problem.
 
-The %OPTS hash is an alias for %Getopt::Complete::OPTS.  The alias is not created 
-in the caller's namespaces if a hash named %OPTS already exists with data.
+The %ARGS hash is an alias for %Getopt::Complete::ARGS.  The alias is not created 
+in the caller's namespaces if a hash named %ARGS already exists with data.
 
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
@@ -644,7 +692,7 @@ and their completions.
 
 This should be at the TOP of the app, before any real processing is done.
 
-Subsequent code can use %OPTS instead of doing any futher options
+Subsequent code can use %ARGS instead of doing any futher options
 parsing.  Existing apps can have their call to Getopt::Long converted
 into "use Getopt::Complete".
 
@@ -1000,7 +1048,7 @@ the options processing which happens automatically.
 
 You can also adjust how option processing happens inside of Getopt::Complete.
 Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
-GetOptions(\%h, @specification) to produce the %OPTS hash.  Customization of
+GetOptions(\%h, @specification) to produce the %ARGS hash.  Customization of
 Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
 
 =head1 DEVELOPMENT
