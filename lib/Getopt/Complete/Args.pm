@@ -205,6 +205,9 @@ sub resolve_possible_completions {
                         ? ($_, 'no-' . $_)
                         : $_
                 }
+                grep {
+                    not (defined $self->option_value($_) and not $self->option_spec($_) =~ /@/)
+                }
                 grep { $_ ne '<>' } @args;
             if (%boolean and not $show_negative_booleans) {
                 # a partial completion for negating booleans when we're NOT
