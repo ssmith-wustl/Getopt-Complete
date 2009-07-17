@@ -473,6 +473,7 @@ sub resolve_possible_completions {
             }
             if (substr($m,0,1) eq "\t") {
                 # abbreviatable...
+                # (nothing does this currently, and the code below which uses it does not work yet)
                 my ($prefix,$abbreviation) = ($m =~ /^\t(.*)\t(.*)$/);
                 push @matches, $prefix . $abbreviation;
                 push @abbreviated_matches, $abbreviation;
@@ -527,33 +528,37 @@ sub resolve_possible_completions {
         };
         
 
-        my $current_length = length($current);
-        if (@matches and ($first_mismatch == $current_length)) {
-            # No partial completion will occur: the shell will show a list now.
-            # Attempt abbreviation of the displayed options:
+        # NOTE: nothing does this currently, and the code below does not work.
+        # Enable to get file/directory completions to be short, like is default in the shell. 
+        if (0) {
+            my $current_length = length($current);
+            if (@matches and ($first_mismatch == $current_length)) {
+                # No partial completion will occur: the shell will show a list now.
+                # Attempt abbreviation of the displayed options:
 
-            my @matches = @abbreviated_matches;
+                my @matches = @abbreviated_matches;
 
-            #my $cut = $current;
-            #$cut =~ s/[^\/]+$//;
-            #my $cut_length = length($cut);
-            #my @matches =
-            #    map { substr($_,$cut_length) } 
-            #    @matches;
+                #my $cut = $current;
+                #$cut =~ s/[^\/]+$//;
+                #my $cut_length = length($cut);
+                #my @matches =
+                #    map { substr($_,$cut_length) } 
+                #    @matches;
 
-            # If there are > 1 abbreviated items starting with the same character
-            # the shell won't realize they're abbreviated, and will do completion
-            # instead of listing options.  We force some variation into the list
-            # to prevent this.
-            my $first_c = substr($matches[0],0,1);
-            my @distinct_firstchar = grep { substr($_,0,1) ne $first_c } @matches[1,$#matches];
-            unless (@distinct_firstchar) {
-                # this puts an ugly space at the beginning of the completion set :(
-                push @matches,' '; 
+                # If there are > 1 abbreviated items starting with the same character
+                # the shell won't realize they're abbreviated, and will do completion
+                # instead of listing options.  We force some variation into the list
+                # to prevent this.
+                my $first_c = substr($matches[0],0,1);
+                my @distinct_firstchar = grep { substr($_,0,1) ne $first_c } @matches[1,$#matches];
+                unless (@distinct_firstchar) {
+                    # this puts an ugly space at the beginning of the completion set :(
+                    push @matches,' '; 
+                }
             }
-        }
-        else {
-            # some partial completion will occur, continue passing the list so it can do that
+            else {
+                # some partial completion will occur, continue passing the list so it can do that
+            }
         }
     }
 
@@ -628,9 +633,11 @@ In the Perl program "myprogram":
       'quiet!'      => undef,
       'name'        => undef,
       'age=n'       => undef,
-      'output'      => \&Getopt::Complete::Compgen::files, 
-      'runthis'     => \&Getopt::Complete::Compgen::commands, 
-      '<>'          => \&Getopt::Complete::Compgen::directories, 
+      'outfile=s@'  => 'files', 
+      'outdir'      => 'directories'
+      'runthis'     => 'commands',
+      'username'    => 'users',
+      '<>'          => 'directories', 
   );
 
   print "the frog says " . $ARGS{frog} . "\n";
@@ -686,39 +693,30 @@ to the @ARGV array generated natively by Perl.
   }
 
 Errors in shell argumentes result in messages to STDERR via warn(), and cause the 
-program to exit during "use".  Getopt::Complete verifies that the option values specified
-match their own completion list, and will otherwise add additional errors
+program to exit during "use" call.  Getopt::Complete verifies that the option values 
+specified match their own completion list, and will otherwise add additional errors
 explaining the problem.
 
 The %ARGS hash is an alias for %Getopt::Complete::ARGS.  The alias is not created 
 in the caller's namespaces if a hash named %ARGS already exists with data, but
 the results are always available from %Getopt::Complete::ARGS.
 
+They keys of the hash are the option names, minus any specifiers like "=s" or "!".
+The key is only present if the option was specified on the command-line.
+
+The values of the hash are the values from the command-line.  For multi-value
+options the hash value is an arrayref.
+
+=head1 OBJECT API
+
+An object $ARGS is also created in the namespace (class L<Getopt::Complete::Args>)
+with a more detailed API.  See the documentation for that module, and 
+L<Getopt::Complete::Options> for details.
+
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
-See OVERRIDING PROCESSING DEFAULTS below for details.
 
-=head1 OBJECT API AND REFLECTION
-
-In the same namespace(s) as the %ARGS hash is an object $ARGS, which provides
-an OO interface to the current arguments, the options behind them, possible 
-completions, etc.
-
-See the following for details on thse APIs:
-
- L<Getopt::Complete::Options>    # the object describing the options available for the app
- 
- L<Getopt::Complete::Args>       # references the above, and represents the post-proceseded @ARGV
- 
- L<Getopt::Complete::Builtins>   # a wrapper for the bash "compgen" builtin, used by bash's "complete" builtin
-
-These objects are also directly constructable for custom options processing solutions.
-
-  my $opts = Getopt::Complete::Options->new("foo=s" => 'f', "bar=s" => [qw/a b c/]);
-  my $args = Getopt::Complete::Args->new(options => $opts, argv => \@ARGV);
-  for my $option_name ($args->option_names) {
-    print $option_name . ' has value ' . $arg->option_value($option_name),"\n"
-  }
+See OVERRIDING COMPILE-TIME OPTION PARSING for more information. 
 
 =head1 PROGRAMMABLE COMPLETION BACKGROUND
 
@@ -752,14 +750,21 @@ and their completions.
 This should be at the TOP of the app, before any real processing is done.
 
 Subsequent code can use %ARGS instead of doing any futher options
-parsing.  Existing apps can have their call to Getopt::Long converted
-into "use Getopt::Complete".
+parsing.  
+
+Existing apps can have their call to Getopt::Long converted
+into "use Getopt::Complete".  If you bind variables directly
+the code would need to be updated to get values from the %ARGS hash.
 
 =item 2
 
 Put the following in your .bashrc or .bash_profile:
 
   complete -C myprogram myprogram
+
+For the very conservative, do this (to ensure nothing runs during completion checks):
+ 
+  complete -C 'perl -c myprogram 2>/dev/null' myprogram
 
 =item 3
 
@@ -856,7 +861,8 @@ are processed:
     myprogram --color purple
     ERROR: color has invalid value purple: select from red green blue
 
-See below for details on how to permit values which aren't shown in completions.
+See below for details on how to permit values which aren't shown in completions to
+be used and not generate errors.
 
 =item undef 
 
@@ -864,15 +870,15 @@ An undefined value indicates that the option is not completable.  No completions
 will be offered by the application, though any value provided by the user will be
 considered valid.
 
-Note that this is distinct from returning an empty arrayref from a callback, which 
-implies that there ARE known completions but the user has failed to match any of them.
+Note that this is distinct from returning an empty arrayref returned from a callback, 
+which implies that there ARE known completions but the user has failed to match any of them.
 
 Also note: this is the only valid completion for boolean parameters, since there is no 
 value to specify on the command-line.
 
   use Getopt::Complete (
-    'first_name'        => undef,
-    'is_perky!'         => undef,
+    'name'      => undef,   # take --name "anyting" 
+    'perky!'    => undef,   # take --perky or --no-perky
   );
 
 =item subroutine callback 
@@ -1137,8 +1143,6 @@ L<Getopt::Long> is the definitive options parser, wrapped by this module.
 =head1 COPYRIGHT
 
 Copyright 2009 Scott Smith and Washington University School of Medicine
-
-=head1 LICENSE
 
 =head1 AUTHORS
 
