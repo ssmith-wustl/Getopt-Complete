@@ -6,6 +6,8 @@ use warnings;
 use version;
 our $VERSION = qv('0.5');
 
+use IPC::Open2;
+
 sub new {
     my $class = shift;
     my $self = bless {
@@ -131,7 +133,6 @@ sub handle_shell_completion {
     return 1;
 }
 
-use IPC::Open2;
 sub _line_to_argv {
     my $line = pop;
     my $cmd = q{perl -e "use Data::Dumper; print Dumper(\@ARGV)" -- } . $line;

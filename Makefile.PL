@@ -1,16 +1,24 @@
-use strict;
-use warnings;
-use ExtUtils::MakeMaker;
 
-WriteMakefile(
-    NAME                => 'Getopt::Complete',
-    AUTHOR              => 'Scott Smith <sakoht@cpan.org>',
-    VERSION_FROM        => 'lib/Getopt/Complete.pm',
-    ABSTRACT_FROM       => 'lib/Getopt/Complete.pm',
-    PL_FILES            => {},
-    PREREQ_PM => {
-        'Test::More' => 0,
-    },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'Getopt-Complete-*' },
-);
+use warnings FATAL => 'all';
+use strict;
+use inc::Module::Install;
+
+name    'Getopt-Complete';
+license 'perl';
+all_from 'lib/Getopt/Complete.pm';
+
+# prereqs
+requires 'Getopt::Long';
+requires 'Scalar::Util';
+requires 'IPC::Open2';
+requires 'version';
+requires 'Carp';
+
+# things the tests need
+build_requires 'Test::More' => '0.86';
+build_requires 'App::Prove';
+
+#tests('t/*.t t/*/*.t');
+
+WriteAll();
+

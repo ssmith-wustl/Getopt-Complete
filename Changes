@@ -1,5 +1,11 @@
 Revision history for Getopt-Complete
 
+0.5     2009-07-18
+        The exported results are now called %ARGS instead of %OPTS.
+        Correctly handling spaces, quotes, etc. by using bash itself to parse the command line.
+        Options are no longer shown in the hint list if they have already been used.
+        Refactored into object-orient structure internally.
+
 0.4     2009-07-15
         Handle negative boolean flags (--no-*) iteratively.
         Handle other options with dashes in the name correctly.

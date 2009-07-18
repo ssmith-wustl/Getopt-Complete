@@ -123,19 +123,19 @@ Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 =head1 DESCRIPTION
 
 This module makes it easy to add custom command-line completion to
-Perl applications, and makes using the shell arguments in the 
-program hassle-free as well.
+Perl applications.  It also makes using the shell arguments in the 
+program hassle-free as well, and does additional validation
+based on completion lists automatically.
 
 The completion features currently work with the bash shell, which is 
 the default on most Linux and Mac systems.  Patches for other shells 
 are welcome.  
 
-
 =head1 OPTIONS PROCESSING
 
 Getopt::Complete processes the command-line options at compile time.
 
-The results are avaialble in an %ARGS hash, which is intended as a companion
+The results are avaialble in the %ARGS hash, which is intended as a companion
 to the @ARGV array generated natively by Perl.
 
   use Getopt::Complete (
@@ -166,9 +166,9 @@ options the hash value is an arrayref.
 
 =head1 OBJECT API
 
-An object $ARGS is also created in the namespace (class L<Getopt::Complete::Args>)
-with a more detailed API.  See the documentation for that module, and 
-L<Getopt::Complete::Options> for details.
+An object $ARGS is also created in the caller's namespace (class L<Getopt::Complete::Args>)
+with a more detailed API for argument interrogation.  See the documentation for that 
+module, and also for the underlying L<Getopt::Complete::Options> module.
 
 It is possible to override any part of the default process, including doing custom 
 parsing, doing processing at run-time, and and preventing exit when there are errors.
@@ -178,18 +178,19 @@ See OVERRIDING COMPILE-TIME OPTION PARSING for more information.
 =head1 PROGRAMMABLE COMPLETION BACKGROUND
 
 The bash shell supports smart completion of words when the <TAB> key is pressed.
-By default, after the prgram name is specified, bash will presume the word the user 
+By default, after the program name is specified, bash will presume the word the user 
 is typing a is a file name, and will attempt to complete the word accordingly.  Where
 completion is ambiguous, the shell will go as far as it can and beep.  Subsequent
 completion attempts at that position result in a list being shown of possible completions.
 
-Bash can be configured to run a specific program to handle the completion task.  
-The "complete" built-in bash command instructs the shell as-to how to handle 
-tab-completion for a given command.  
+Bash can be configured to run a specific program to handle the completion task, allowing
+custom completions to be done for different appliations. The "complete" built-in bash 
+command instructs the shell as-to how to handle tab-completion for a given command.  
 
 This module allows a program to be its own word-completer.  It detects that the 
-COMP_LINE and COMP_POINT environment variables, are set, and responds by returning 
-completion values suitable for the shell _instead_ of really running the application.
+COMP_LINE and COMP_POINT environment variables are set, indicating that it is being
+used as a completion program, and responds by returning completion values suitable 
+for the shell _instead_ of really running the application.
 
 See the manual page for "bash", the heading "Programmable Completion" for full 
 details on the general topic.
@@ -205,13 +206,16 @@ The key-value pairs describe the command-line options available,
 and their completions.
 
 This should be at the TOP of the app, before any real processing is done.
+The only modules used before it should be those needed for custom callbacks,
+if there are any.  No code should print to standard output during compile
+time, or it will confuse bash.
 
-Subsequent code can use %ARGS instead of doing any futher options
-parsing.  
+Subsequent code can use %ARGS or the $ARGS object to check on command-line
+option values.
 
-Existing apps can have their call to Getopt::Long converted
-into "use Getopt::Complete".  If you bind variables directly
-the code would need to be updated to get values from the %ARGS hash.
+Existing apps using Getopt::Long should use their option spec in the use declaration 
+instead. If they bind variables directly the code should to be updated to get 
+values from the %ARGS hash instead.
 
 =item 2
 
@@ -557,13 +561,13 @@ it is talking to bash, to prevent accidentally running your program).
 
 Errors will be retained in:
  
- @Getopt::Complete::ERRORS
+ $Getopt::Complete::ARGS->errors;
 
 This module restores @ARGV to its original state after processing, so 
 independent option processing can be done if necessary.  The full
 spec imported by Getopt::Complete is stored as:
 
- @Getopt::Complete::OPT_SPEC;
+ $Getopt::Complete::ARGS->option_specs;
 
 With the flag above, set, you can completely ignore, or partially ignore,
 the options processing which happens automatically.
@@ -572,6 +576,67 @@ You can also adjust how option processing happens inside of Getopt::Complete.
 Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
 GetOptions(\%h, @specification) to produce the %ARGS hash.  Customization of
 Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
+
+=head1 EXAMPLE
+
+Cut-and-paste this into a script called "myprogram" in your path, make it executable, 
+and then run this in the shell: complete -C myprogram myprogram.  Then try it out.
+
+    #!/usr/bin/env perl
+    use strict;
+    use Data::Dumper;
+
+    use Getopt::Complete (
+        # list the explicit values which are valid for this option
+        'frog'    => ['ribbit','urp','ugh'],
+
+        # you can add any valid Getopt::Long specification to the key on the left
+        # ...if you put nothing: "=s" is assumed
+        'names=s@' => ['eenie','meanie','miney'],
+
+        # support for Bash "compgen" builtins is present with some pre-made callbacks
+        'myfile'    => 'Getopt::Complete::Compgen::files',
+        'mydir'     => 'Getopt::Complete::Compgen::directories',
+        
+        # the plain name or first letter of the compgen builtins also work
+        'myfile2'   => 'files',
+        'myfile3'   => 'f',
+
+        # handle unnamed arguments from the command-line ("non-option" arguments) with a special key:
+        '<>'      => ['some','raw','words'],
+
+        # CODE callbacks allow a the completion list to be dynamically resolved 
+        'fraggle' => sub { return ['rock','roll'] },
+
+        # callbacks get extra info to help them, including the part of the
+        # word already typed, and the remainder of the options already processed for context
+        'type'    => ['people','places'],
+        'instance'=> sub {
+                            my ($command, $partial_word, $option_name, $other_opts_hashref) = @_;
+                            # be lazy and ignore the partial word: bash will compensate
+                            if (my $type = $other_opts_hashref->{type}) {
+                                if ($type eq 'people') {
+                                    return [qw/larry moe curly/]
+                                }
+                                elsif ($type eq 'places') {
+                                    return [qw/here there everywhere/],
+                                }
+                            }
+                            return [];
+                        },
+        
+        # undef means we don't know how to complete the value: any value specified will do
+        # this will result in no shell ompletions, but will still expect a value to be entered
+        'name=s'  => undef,
+
+        # boolean values never have a completion list, and will yell if you are that foolish
+        # this will give you --no-fast for free as well
+        'fast!'     => undef,
+    );
+
+    use Data::Dumper;
+    print "The arguments are: " . Dumper(\%ARGS);
+
 
 =head1 DEVELOPMENT
 
@@ -584,9 +649,9 @@ Patches are welcome.
 =head1 BUGS
 
 The logic to "shorten" the completion options shown in some cases is still in development. 
-This means that filename completion shows full paths as options instead of just the basename of the file in question.
+This means that filename completion shows full paths as options instead of just the last word in the file path.
 
-Some uses of Getopt::Long will not work currently: multi-name options, +, :, --no-*, --no*.
+Some uses of Getopt::Long will not work currently: multi-name options, +, :.
 
 Currently this module only supports bash, though other shells could be added easily.
 
@@ -595,7 +660,30 @@ is incomplete.
 
 =head1 SEE ALSO
 
-L<Getopt::Long> is the definitive options parser, wrapped by this module.
+=over 4
+
+=item L<Getopt::Complete::Args> 
+
+the object API for the option/value argument set
+
+=item L<Getopt::Complete::Options> 
+
+the object API for the options specification
+
+=item L<Getopt::Complete::Compgen> 
+
+supplies builtin completions like file lists
+
+=item L<Getopt::Long> 
+
+the definitive options parser, wrapped by this module
+
+
+=item L<bash> 
+
+the manual page for bash has lots of info on how tab-completion works
+
+=back
 
 =head1 COPYRIGHT
 
