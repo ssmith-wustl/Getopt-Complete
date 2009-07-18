@@ -22,8 +22,13 @@ sub import {
         # re-using this module after options processing, with no arguments,
         # will just re-export (alias, actually) %ARGS and $ARGS.
         if ($ARGS) {
+            print STDERR ">> just exporting\n";
             $class->export_aliases();
         }
+        else {
+            print STERR ">> just using\n";
+        }
+        return;
     }
 
     if ($ARGS) {
@@ -51,11 +56,14 @@ sub import {
         argv => [@ARGV]
     );
    
+    print Data::Dumper::Dumper($args);
+
     # Then make it and its underlying hash available globally in this namespace
     $args->__install_as_default__();
 
-    # Alias the above into the caller's namespace.
-    $class->export_aliases(caller());
+    # Alias the above into the caller's namespace
+    my $caller = caller();
+    $class->export_aliases($caller);
     
     # This is overridable externally.
     unless ($EXIT_ON_ERRORS) {
@@ -357,8 +365,8 @@ An undefined value indicates that the option is not completable.  No completions
 will be offered by the application, though any value provided by the user will be
 considered valid.
 
-Note that this is distinct from returning an empty arrayref returned from a callback, 
-which implies that there ARE known completions but the user has failed to match any of them.
+Note that this is distinct from returning an empty arrayref from a callback, which 
+implies that there ARE known completions but the user has failed to match any of them.
 
 Also note: this is the only valid completion for boolean parameters, since there is no 
 value to specify on the command-line.
@@ -540,6 +548,21 @@ ERRORS array described above.
     
 =head1 PARTIAL COMPLETIONS
 
+=over 4
+
+=head2 BASICS
+
+Any returned value ending in a <TAB> character ("\t") will be considered
+a "partial" completion.  This means that the shell will be instructed
+to leave the cursor at the end of that word even if there is no ambiguity
+in the rest of the returned list.
+
+Partial completions are only usable from callbacks.  From a hard-coded
+array of values, it would be impossible to ever fuly complete the partial
+completion.
+
+=head2 BACKGROUND
+
 Sometimes, the entire list of completions is too big to reasonable resolve and
 return.  The most obvious example is filename completion at the root of a 
 large filesystem.  In these cases, the completion of is handled in pieces, allowing
@@ -554,15 +577,22 @@ parameter configured with a callback.  It is completely valid to complete
 Unless the shell knows, however that your "aa", "ab", and "ac" completions are 
 in fact only partial completions, an inconvenient space will be added 
 after the word on the terminal line, as the shell happily moves on to helping
-the user enter the next argument
+the user enter the next argument.
 
-Partial completions are indicated in Getopt::Complete by adding a "\t" 
-tab character to the end of the returned string.  This means you can
+=head2 DETAILS
+
+Because partial completions are indicated in Getopt::Complete by adding a "\t" 
+tab character to the end of the returned string, an application can
 return a mix of partial and full completions, and it will respect each 
-correctly.  (The "\t" is actually stripped-off before going to the shell
+correctly.  
+
+Note: The "\t" is actually stripped-off before going to the shell
 and internal hackery is used to force the shell to not put a space 
 where it isn't needed.  This is not part of the bash programmable completion
-specification.)
+specification, but is used to simulate features typically only available
+with bash for builtin completions like files/directories.
+
+=back
 
 =head1 SUB-COMMAND TREES
 
@@ -570,7 +600,7 @@ It is common for a given appliction to actually be an entry point for several di
 Popular exmples are the big version control suites (cvs,svn,svk,git), which use
 the form:
 
- git SUBCOMMAND [ARGS]
+ cvs SUBCOMMAND [ARGS]
 
 Each sub-command has its own options specification.  Those may in turn have further sub-commands.
 
@@ -578,7 +608,7 @@ Sub-commands are identified by an initial '>' in the options specification key. 
 is interpreted as a complete, isolated options spec, using the same general syntax.  This
 applies recursively.
 
-=head2 EXAMPLE COMMAND TREE
+=head2 EXAMPLE COMMAND TREE SPEC
 
     use Getopt::Complete (
         '>animal' => [
@@ -625,14 +655,34 @@ applies recursively.
         ]
     );
 
+    my ($word1,$word2,$word3) = $ARGS->parent_sub_commands; 
+    # (the above is also in $ARGS{'>'} for non-OO access)
+
+    # your program probably has something smarter to decide where to go 
+    # for a given command
+    if ($word1 eq 'animal') {
+        if ($word2 eq 'dog') {
+            if ($word3 eq 'bark') {
+                # work with %ARGS for barking dogs...
+                # ....
+            }
+        }
+    }
+    elsif ($path[0] eq 'plant') {
+        ...
+    }
+
 The above example specifies two sub-commands "animal" and "plant, each of which has its own two 
-sub-commands, dog/cat and taters/dasies.  Each of those in turn have two sub-commands,
-for a total of 8 complete commands.  Each of the 8 has thier own options specification:
+sub-commands, dog/cat and taters/dasies.  Each of those, in turn, have two sub-commands,
+for a total of 8 complete commands possible, each with different arguments.  Each of the 
+8 has thier own options specification.
 
 When the program executes, the %ARGS hash contains option/value pairs for the specific command
 chosen.  The the series of sub-command choices in $ARGS{'>'}, separate from the regular bare
-arguments in '<>'. (The method name on an $ARGS object for this is "parent_sub_commands", where
-the method to determine the next available sub-commands is just "sub_commands".)
+arguments in '<>'. (The method name on an $ARGS object for this is "parent_sub_commands", a 
+companion to the "bare_args" method.
+
+The method to determine the next available sub-commands is just "sub_commands".)
 
 Note that, since the user can hit <ENTER> at any time, it is possible that the parent_sub_commands
 will be a partial drill-down.  It isn't uncommon to have something like this in place:
@@ -643,7 +693,7 @@ will be a partial drill-down.  It isn't uncommon to have something like this in 
     exit 1;
  }
 
-The above is not done automatically, since a sub-command may have further sub-commands, but 
+The above checking is not done automatically, since a sub-command may have further sub-commands, but 
 still also be used directly, possibly with other option and bare arguments.
 
 =head1 THE LONE DASH

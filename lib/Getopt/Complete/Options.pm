@@ -37,6 +37,7 @@ sub option_specs {
     my $self = shift;
     my @specs;
     for my $key (keys %{ $self->{option_specs} }) {
+        next if $key eq '<>';
         my $value = $self->{option_specs}{$key};
         push @specs, $key . $value;
     }
@@ -48,6 +49,12 @@ sub option_spec {
     my $name = shift;
     Carp::confess("Bad params") if not defined $name;
     return $self->{option_specs}{$name};
+}
+
+sub has_option {
+    my $self = shift;
+    my $name = shift;
+    return exists $self->{completion_handlers}{$name};
 }
 
 sub completion_handler {

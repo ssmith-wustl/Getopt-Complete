@@ -223,8 +223,8 @@ sub resolve_possible_completions {
         if ($current =~ /^(-+)/
             or (
                 $current eq ''
-                and not $self->sub_commands
-                and not $self->option_spec('<>')
+                and not ($self->sub_commands)
+                and not ($self->options->has_option('<>'))
             )
         ) {
             # the incomplete word is an option name
@@ -288,7 +288,7 @@ sub resolve_possible_completions {
             push @possibilities, $self->sub_commands;
             if (grep { $_ ne '<>' and substr($_,0,1) ne '>' } $self->option_names) {
                 # do a partial completion on dashes if there are any non-bare (option) arguments
-                push @possibilities, "--\t"
+                #push @possibilities, "--\t"
             }
         }
     }
@@ -412,13 +412,8 @@ sub resolve_possible_completions {
 
 sub __install_as_default__ {
     my $self = shift;
-    
-
-    # Then make it and its underlying hash available globally.
-    
-    *Getopt::Complete::ARGS = $self;
+    *Getopt::Complete::ARGS = \$self;
     *Getopt::Complete::ARGS = \%{ $self->{values} };
-
 }
 
 1;
