@@ -34,7 +34,7 @@ use Getopt::Complete (
                 'width'         => ['fat','thin','frite'],
             ]
         ],
-        '>dasies' => [
+        '>daisies' => [
             '>pick' => [
                 '<>'            => ['mine','yours','theirs'],
             ],

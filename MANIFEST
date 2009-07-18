@@ -10,6 +10,7 @@ inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
 INSTALL
 lib/Getopt/Complete.pm
+lib/Getopt/Complete/.Args.pm.swp
 lib/Getopt/Complete/Args.pm
 lib/Getopt/Complete/Compgen.pm
 lib/Getopt/Complete/Options.pm
@@ -24,4 +25,5 @@ t/boilerplate.t
 t/exercise.t
 t/myprogram
 t/myprogram2
+t/mytreeapp
 t/pod.t
