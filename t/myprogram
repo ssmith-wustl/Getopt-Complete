@@ -54,18 +54,22 @@ use Getopt::Complete (
 
         '>animal' => [
             '>dog' => [
-                '>drool' => [
-                    'buckets=n' => undef, 
-                    'lick'      => 'files', 
-                ],
                 '>bark' => [
                     'ferocity'  => ['yip','wail','ruf','grrrr'], 
-                    'count=n@'  => ['id','name','build_date'],
-                ]
+                    'count'  => ['1','2','one too many'], 
+                ],
+                '>drool' => [
+                    'buckets=n' => undef, 
+                    'lick'      => 'users', 
+                ],
+                'list!' => undef,
             ],
             '>cat' => [
                 '>purr' => [],
-                '>meow' => [],
+                '>meow' => [ 
+                    'volume=n' => undef,
+                    'bass' => ['low','medium','high'],
+                ]
             ],
         ],
         '>plant' => [

@@ -13,11 +13,23 @@ use Getopt::Complete::Compgen;
 our $ARGS;
 our %ARGS;
 
+our $EXIT_ON_ERRORS = 1;
 our $LONE_DASH_SUPPORT = 1;
 
 sub import {    
     my $class = shift;
-    return unless @_;
+    unless (@_) {
+        # re-using this module after options processing, with no arguments,
+        # will just re-export (alias, actually) %ARGS and $ARGS.
+        if ($ARGS) {
+            $class->export_aliases();
+        }
+    }
+
+    if ($ARGS) {
+        # Turn on fatal warnings, and this will safely be a die().
+        warn "Overriding default command-line %ARGS with a second call to Getopt::Complete!";
+    }
 
     # The safe way to use this module is to specify args at compile time.  
     # This allows 'perl -c' to handle shell-completion requests.
@@ -34,38 +46,42 @@ sub import {
 
     # and then a single default Getopt::Complete::Args object.
     
-    $ARGS = Getopt::Complete::Args->new(
+    my $args = Getopt::Complete::Args->new(
         options => $options,
         argv => [@ARGV]
     );
+   
+    # Then make it and its underlying hash available globally in this namespace
+    $args->__install_as_default__();
+
+    # Alias the above into the caller's namespace.
+    $class->export_aliases(caller());
     
-    if (my @errors = $ARGS->errors) {
-        for my $error ($ARGS->errors) {
-            chomp $error;
-            warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+    # This is overridable externally.
+    unless ($EXIT_ON_ERRORS) {
+        if (my @errors = $ARGS->errors) {
+            for my $error ($ARGS->errors) {
+                chomp $error;
+                warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+            }
+            exit 1;
         }
-        exit 1;
     }
+}
 
-    # Then make it and its underlying hash available globally.
-    
-    *ARGS = \%{ $ARGS->{values} };
-    
-    # And export it into the caller's namespace
-
-    do {
-        no strict 'refs';
-        my $pkg = caller();
-        my $v;
-        $v = ${ $pkg . "::ARGS" };
-        unless (defined $v) {
-            *{ $pkg . "::ARGS" } = \$ARGS;
-        }
-        $v = \%{ $pkg . "::ARGS" };
-        unless (keys %$v) {
-            *{ $pkg . "::ARGS" } = \%ARGS;
-        }
-    };
+sub export_aliases {
+    my ($class,$pkg) = @_;
+    no strict 'refs';
+    $pkg ||= caller();
+    my $v;
+    $v = ${ $pkg . "::ARGS" };
+    unless (defined $v) {
+        *{ $pkg . "::ARGS" } = \$ARGS;
+    }
+    $v = \%{ $pkg . "::ARGS" };
+    unless (keys %$v) {
+        *{ $pkg . "::ARGS" } = \%ARGS;
+    }
 }
 
 1;
@@ -289,6 +305,16 @@ Take arbitrary values with no expectations:
  '<>' = undef
 
 If there is no '<>' key specified, bare arguments will be treated as an error.
+
+=item a sub-command specifier, starting with '>'
+
+When a key in the options specification starts with '>', it indicates
+a that word maps to a distinct sub-command with its own options.  The
+array to the right is itself a full options specification, following
+the same format as the one above it, including possible further
+sub-commands.
+
+See SUB-COMMAND TREES for more details.
 
 =back
 
@@ -538,11 +564,94 @@ and internal hackery is used to force the shell to not put a space
 where it isn't needed.  This is not part of the bash programmable completion
 specification.)
 
+=head1 SUB-COMMAND TREES
+
+It is common for a given appliction to actually be an entry point for several different tools.
+Popular exmples are the big version control suites (cvs,svn,svk,git), which use
+the form:
+
+ git SUBCOMMAND [ARGS]
+
+Each sub-command has its own options specification.  Those may in turn have further sub-commands.
+
+Sub-commands are identified by an initial '>' in the options specification key.  The value
+is interpreted as a complete, isolated options spec, using the same general syntax.  This
+applies recursively.
+
+=head2 EXAMPLE COMMAND TREE
+
+    use Getopt::Complete (
+        '>animal' => [
+            '>dog' => [
+                '>bark' => [
+                    'ferocity'  => ['yip','wail','ruf','grrrr'], 
+                    'count'  => ['1','2','one too many'], 
+                ],
+                '>drool' => [
+                    'buckets=n' => undef, 
+                    'lick'      => 'users', 
+                ],
+                'list!' => undef,
+            ],
+            '>cat' => [
+                '>purr' => [],
+                '>meow' => [ 
+                    'volume=n' => undef,
+                    'bass' => ['low','medium','high'],
+                ]
+            ],
+        ],
+        '>plant' => [
+            '>taters' => [
+                '>fry' => [
+                    'greasiness'    => ['crispy','drippy'],
+                    'width'         => ['fat','thin','frite'],
+                ],
+                '>bake' => [
+                    'hard!'     => undef,
+                    'temp=n'    => undef,
+                ],
+            ],
+            '>dasies' => [
+                '>pick' => [
+                    '<>'            => ['mine','yours','theirs'],
+                ],
+                '>plant' => [
+                    'season'        => ['winter','spring','summer','fall'],
+                    'seeds=n'       => undef,
+                    'deep!'         => undef,
+                ]
+            ]
+        ]
+    );
+
+The above example specifies two sub-commands "animal" and "plant, each of which has its own two 
+sub-commands, dog/cat and taters/dasies.  Each of those in turn have two sub-commands,
+for a total of 8 complete commands.  Each of the 8 has thier own options specification:
+
+When the program executes, the %ARGS hash contains option/value pairs for the specific command
+chosen.  The the series of sub-command choices in $ARGS{'>'}, separate from the regular bare
+arguments in '<>'. (The method name on an $ARGS object for this is "parent_sub_commands", where
+the method to determine the next available sub-commands is just "sub_commands".)
+
+Note that, since the user can hit <ENTER> at any time, it is possible that the parent_sub_commands
+will be a partial drill-down.  It isn't uncommon to have something like this in place:
+
+ if (my @next = $ARGS->sub_commands) {
+    print STDERR "Please select a sub-command:\n";
+    print STDERR join("\n", @sub_commands),"\n";
+    exit 1;
+ }
+
+The above is not done automatically, since a sub-command may have further sub-commands, but 
+still also be used directly, possibly with other option and bare arguments.
+
 =head1 THE LONE DASH
 
 A lone dash is often used to represent using STDIN instead of a file for applications which otherwise take filenames.
 
-This is supported by all options which complete with the "files" builtin, though it does not appear in completions.
+This is supported by all options which complete with the "files" builtin, though it does not appear in completion hint displays.
+
 To disable this, set $Getopt::Complete::LONE_DASH = 0.
 
 =head1 OVERRIDING COMPILE-TIME OPTION PARSING 
@@ -550,18 +659,26 @@ To disable this, set $Getopt::Complete::LONE_DASH = 0.
 Getopt::Complete makes a lot of assumptions in order to be easy to use in the
 default case.  Here is how to override that behavior if it's not what you want.
 
+=over 4
+
+=head2 OPTION 1: DOING CUSTOM ERROR HANDLING
+
 To prevent Getopt::Complete from exiting at compile time if there are errors,
-the NO_EXIT_ON_ERRORS flag should be set first, at compile time, before using
+the EXIT_ON_ERRORS flag should be set to 0 first, at compile time, before using
 the Getopt::Complete module as follows:
 
- BEGIN { $Getopt:Complete::NO_EXIT_ON_ERRORS = 1; }
+ BEGIN { $Getopt:Complete::EXIT_ON_ERRORS = 0; }
 
 This should not affect completions in any way (it will still exit if it realizes
 it is talking to bash, to prevent accidentally running your program).
 
-Errors will be retained in:
+Errors are retained in:
  
  $Getopt::Complete::ARGS->errors;
+
+It is then up to the application to not run with invalid parameters.
+
+=head2 OPTION 2: RE-PROCESS @ARGV
 
 This module restores @ARGV to its original state after processing, so 
 independent option processing can be done if necessary.  The full
@@ -569,22 +686,64 @@ spec imported by Getopt::Complete is stored as:
 
  $Getopt::Complete::ARGS->option_specs;
 
-With the flag above, set, you can completely ignore, or partially ignore,
-the options processing which happens automatically.
+This is an easy option when upgrading old applications.
+
+Combined with disabling the EXIT_ON_ERROS flag  above, set, you can completely ignore, 
+or partially ignore, the options processing which happens automatically.
+
+=head2 OPTION 3: CHANGING COMPILE-TIME PROCESSING
 
 You can also adjust how option processing happens inside of Getopt::Complete.
 Getopt::Complete wraps Getopt::Long to do the underlying option parsing.  It uses
 GetOptions(\%h, @specification) to produce the %ARGS hash.  Customization of
 Getopt::Long should occur in a BEGIN block before using Getopt::Complete.  
 
-=head1 EXAMPLE
+=head2 OPTION 4: USE THE OBJECTS AND WRITE YOUR OWN LOGIC
+
+The logic in import() is very short, and is simple to modify.  It is best
+to do it in a BEGIN {} block so that bash can use 'perl -c myprogram'
+to get completions at compile time.
+
+    BEGIN {
+
+        my $options = Getopt::Complete::Options->new(
+            'myfile' => 'f',
+            'mychoice' => ['small','medium','huge']
+        );
+
+        $options->handle_shell_completion();
+
+        my $args = Getopt::Complete::Args->new(
+            options => $options,
+            argv => [@ARGV]
+        );
+        
+        if (my @errors = $ARGS->errors) {
+            for my $error ($ARGS->errors) {
+                chomp $error;
+                warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+            }
+            exit 1;
+        }
+    
+        # make the %ARGS available to all of the app
+        $args->__install_as_default__;
+
+        # if you also want %ARGS and $ARGS here when you're finished...
+        Getopt:Complete->export_aliases(__PACKAGE__);
+    };
+
+=back
+
+=head1 EXTENSIVE USAGE EXAMPLE
 
 Cut-and-paste this into a script called "myprogram" in your path, make it executable, 
 and then run this in the shell: complete -C myprogram myprogram.  Then try it out.
+It does one of everything, besides command trees.
 
     #!/usr/bin/env perl
     use strict;
-    use Data::Dumper;
+    use warnings;
 
     use Getopt::Complete (
         # list the explicit values which are valid for this option
@@ -632,11 +791,11 @@ and then run this in the shell: complete -C myprogram myprogram.  Then try it ou
         # boolean values never have a completion list, and will yell if you are that foolish
         # this will give you --no-fast for free as well
         'fast!'     => undef,
+
     );
 
     use Data::Dumper;
     print "The arguments are: " . Dumper(\%ARGS);
-
 
 =head1 DEVELOPMENT
 
@@ -646,12 +805,24 @@ Patches are welcome.
 
  git clone git://github.com/sakoht/Getopt--Complete-for-Perl.git
 
+As are complaints.  Help us find bugs by sending an email to the address below, or using CPAN's bug tracking system:
+ 
+ https://rt.cpan.org/
+
+The latest version of this module is always availabe on CPAN:
+
+ http://search.cpan.org/search?query=Getopt%3A%3AComplete&mode=all
+
+And is readily installable with the CPAN shell on Mac, Linux, and other Unix-like systems:
+
+ sudo cpan Getopt::Complete
+
 =head1 BUGS
 
 The logic to "shorten" the completion options shown in some cases is still in development. 
 This means that filename completion shows full paths as options instead of just the last word in the file path.
 
-Some uses of Getopt::Long will not work currently: multi-name options, +, :.
+Some uses of Getopt::Long will not work currently: multi-name options, +, :, %.
 
 Currently this module only supports bash, though other shells could be added easily.
 
@@ -677,7 +848,6 @@ supplies builtin completions like file lists
 =item L<Getopt::Long> 
 
 the definitive options parser, wrapped by this module
-
 
 =item L<bash> 
 
