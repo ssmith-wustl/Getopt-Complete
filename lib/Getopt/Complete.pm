@@ -90,7 +90,7 @@ sub export_aliases {
 
 =head1 NAME
 
-Getopt::Complete - custom programmable shell completion for Perl apps
+Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
