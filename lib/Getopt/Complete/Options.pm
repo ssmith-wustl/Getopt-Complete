@@ -4,13 +4,15 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.5');
+our $VERSION = qv('0.6');
 
 use IPC::Open2;
+use Data::Dumper;
 
 sub new {
     my $class = shift;
     my $self = bless {
+        sub_commands => [],
         option_specs => {},
         completion_handlers => {},
         parse_errors => undef,
@@ -19,8 +21,11 @@ sub new {
     # process the params into normalized completion handlers
     # if there are problems, the ->errors method will return a list.
     $self->_init(@_);
-
     return $self;
+}
+
+sub sub_commands {
+    return @{ shift->{sub_commands} };
 }
 
 sub option_names {
@@ -62,7 +67,7 @@ sub _init {
     while (my $key = shift @_) {
         my $handler = shift @_;
         
-        my ($name,$spec) = ($key =~ /^([\w|-]+|\<\>|)(\W.*|)/);
+        my ($name,$spec) = ($key =~ /^([\w|-|\>]\w+|\<\>|)(\W.*|)/);
         if (not defined $name) {
             push @parse_errors,  __PACKAGE__ . " is unable to parse '$key' from spec!";
             next;
@@ -89,6 +94,19 @@ sub _init {
                 $handler = $code;
             }
         }
+        if (substr($name,0,1) eq '>') {
+            # a "sub-command": make a sub-options tree, which may happen recursively
+            my $word = substr($name,1);
+            unless (ref($handler) eq 'ARRAY') {
+                die "expected arrayref for $name value!";
+            }
+            $handler = Getopt::Complete::Options->new(@$handler);
+            $handler->{command} = ($self->{command} || '') . " " . $word; 
+            $completion_handlers->{$name} = $handler;
+            push @{ $self->{sub_commands} }, $word;
+            next;
+        }
+
         $completion_handlers->{$name} = $handler;
         if ($name eq '<>') {
             next;
@@ -152,9 +170,17 @@ sub parse_completion_request {
     my ($comp_line, $comp_point) = @_;
 
     my $left = substr($comp_line,0,$comp_point);
-    my $right = substr($comp_line,$comp_point);
-    
     my @left = _line_to_argv($left);
+
+    if (@left and my $delegate = $self->completion_handler('>' . $left[0])) {
+        # the first word matches a sub-command for this command
+        # delegate to the options object for that sub-command, which
+        # may happen recursively
+        print STDERR ">> delegating to $left[0]\n";
+        return $delegate->parse_completion_request(@_);
+    }
+
+    my $right = substr($comp_line,$comp_point);
     my @right = _line_to_argv($right);
     
     unless (@left) {
@@ -208,7 +234,7 @@ Getopt::Complete::Options - a command-line options specification
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.5.
+This document describes Getopt::Complete v0.6.
 
 =head1 SYNOPSIS
 
