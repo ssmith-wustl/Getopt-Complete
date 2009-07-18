@@ -117,6 +117,12 @@ sub handle_shell_completion {
     my $self = shift;
     if ($ENV{COMP_LINE}) {
         my ($command,$current,$previous,$other) = $self->parse_completion_request($ENV{COMP_LINE},$ENV{COMP_POINT});
+        unless ($command) {
+            # parse error
+            # this typically only happens when there are mismatched quotes, which means something you can't complete anyway
+            # don't complete anything...
+            exit;
+        }
         my $args = Getopt::Complete::Args->new(options => $self, argv => $other);
         my @matches = $args->resolve_possible_completions($command,$current,$previous);
         print join("\n",@matches),"\n";
@@ -125,22 +131,50 @@ sub handle_shell_completion {
     return 1;
 }
 
+use IPC::Open2;
+sub _line_to_argv {
+    my $line = pop;
+    my $cmd = q{perl -e "use Data::Dumper; print Dumper(\@ARGV)" -- } . $line;
+    my ($reader,$writer);
+    my $pid = open2($reader,$writer,'bash 2>/dev/null');
+    return unless $pid;
+    print $writer $cmd;
+    close $writer;
+    my $result = join("",<$reader>);
+    no strict; no warnings;
+    my $array = eval $result;
+    return @$array;
+}
+
 sub parse_completion_request {
     my $self = shift;
     my ($comp_line, $comp_point) = @_;
 
-    # This command has been set to autocomplete via "completeF".
     my $left = substr($comp_line,0,$comp_point);
-    my $current = '';
-    if ($left =~ /([^\=\s]+)$/) {
-        $current = $1;
-        $left = substr($left,0,length($left)-length($current));
+    my $right = substr($comp_line,$comp_point);
+    
+    my @left = _line_to_argv($left);
+    my @right = _line_to_argv($right);
+    
+    unless (@left) {
+        # parse error
+        return;
     }
-    $left =~ s/\s+$//;
 
-    my @other_options = split(/\s+/,$left);
-    my $command = $other_options[0];
-    my $previous = pop @other_options if @other_options and $other_options[-1] =~ /^--/;
+    my $command = shift @left;
+    my $current;
+    if (@left and $left[-1] eq substr($left,-1*length($left[-1]))) {
+        # we're at the end of the final word in the @left list, and are trying to complete it
+        $current = pop @left;
+    }
+    else {
+        # we're starting to complete an empty word
+        $current = '';
+    }
+    my $previous = ( (@left and $left[-1] =~ /^--/) ? (pop @left) : ()) ;
+    my @other_options = (@left,@right);
+
+
     # it's hard to spot the case in which the previous word is "boolean", and has no value specified
     if ($previous) {
         my ($name) = ($previous =~ /^-+(.*)/);
