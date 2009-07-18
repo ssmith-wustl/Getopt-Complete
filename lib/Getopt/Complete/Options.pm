@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.7');
+our $VERSION = qv('0.8');
 
 use IPC::Open2;
 use Data::Dumper;
@@ -241,7 +241,7 @@ Getopt::Complete::Options - a command-line options specification
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.7.
+This document describes Getopt::Complete v0.8.
 
 =head1 SYNOPSIS
 

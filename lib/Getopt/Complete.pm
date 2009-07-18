@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.7');
+our $VERSION = qv('0.8');
 
 use Getopt::Complete::Options;
 use Getopt::Complete::Args;
@@ -102,7 +102,7 @@ Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.7.
+This document describes Getopt::Complete v0.8.
 
 =head1 SYNOPSIS
 

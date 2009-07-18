@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.7');
+our $VERSION = qv('0.8');
 
 use Getopt::Long;
 use Scalar::Util;
@@ -426,7 +426,7 @@ Getopt::Complete::Args - a set of option/value pairs
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Args v0.7.
+This document describes Getopt::Complete::Args v0.8.
 
 =head1 SYNOPSIS
 
