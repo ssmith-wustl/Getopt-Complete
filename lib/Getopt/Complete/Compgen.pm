@@ -56,7 +56,7 @@ for my $subname (qw/
 
 =head1 NAME
 
-Getopt::Complete::Compgen - built-in standard shell completions 
+Getopt::Complete::Compgen - standard tab-completion callbacks
 
 =head1 VERSION
 
@@ -84,7 +84,7 @@ This document describes Getopt::Complete::Compgen v0.6.
 =head1  DESCRIPTION
 
 This module contains subroutines which can be used as callbacks with Getopt::Complete,
-and which implement all of the standard completions supported by "compgen"
+and which implement all of the standard completions supported by the bash "compgen" builtin.
 
 Running "compgen -o files abc" will produce the completion list as though the user typed "abc<TAB>",
 with the presumption the user is attempting to complete file names.
