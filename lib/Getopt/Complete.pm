@@ -22,11 +22,7 @@ sub import {
         # re-using this module after options processing, with no arguments,
         # will just re-export (alias, actually) %ARGS and $ARGS.
         if ($ARGS) {
-            print STDERR ">> just exporting\n";
             $class->export_aliases();
-        }
-        else {
-            print STERR ">> just using\n";
         }
         return;
     }
@@ -56,8 +52,6 @@ sub import {
         argv => [@ARGV]
     );
    
-    print Data::Dumper::Dumper($args);
-
     # Then make it and its underlying hash available globally in this namespace
     $args->__install_as_default__();
 

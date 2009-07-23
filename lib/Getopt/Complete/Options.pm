@@ -183,7 +183,6 @@ sub parse_completion_request {
         # the first word matches a sub-command for this command
         # delegate to the options object for that sub-command, which
         # may happen recursively
-        print STDERR ">> delegating to $left[0]\n";
         return $delegate->parse_completion_request(@_);
     }
 
