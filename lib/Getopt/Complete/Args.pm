@@ -181,6 +181,7 @@ sub _validate_values {
         for my $value (@values) {
             next if not defined $value;
             next if not defined $completions;
+            my @valid_values_shown_in_message;
             if (ref($completions) eq 'CODE') {
                 # we pass in the value as the "completeme" word, so that the callback
                 # can be as optimal as possible in determining if that value is acceptable.
@@ -195,12 +196,17 @@ sub _validate_values {
                 next;
             }
             my @valid_values = @$completions;
+            @valid_values_shown_in_message = @valid_values;
+            
             if (ref($valid_values[-1]) eq 'ARRAY') {
                 push @valid_values, @{ pop(@valid_values) };
+                pop @valid_values_shown_in_message;
             }
             unless (grep { $_ eq $value } map { /(.*)\t$/ ? $1 : $_ } @valid_values) {
-                my $label = ($key eq '<>' ? "invalid argument $value." : "$key has invalid value $value."); 
-                my $msg = ($label  . ".  Select from: " . join(", ", map { /^(.+)\t$/ ? $1 : $_ } @valid_values) . "\n");
+                my $msg = ($key eq '<>' ? "invalid argument $value." : "$key has invalid value $value."); 
+                if (@valid_values_shown_in_message) {
+                    $msg .= "  Select from: " . join(", ", map { /^(.+)\t$/ ? $1 : $_ } @valid_values_shown_in_message);
+                }
                 push @failed, $msg;
             }
         }
