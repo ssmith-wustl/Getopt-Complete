@@ -14,7 +14,7 @@ our $ARGS;
 our %ARGS;
 
 our $EXIT_ON_ERRORS = 1;
-our $LONE_DASH_SUPPORT = 1;
+our $LONE_DASH_SUPPORT = 0;
 
 sub import {    
     my $class = shift;
