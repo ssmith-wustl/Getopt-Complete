@@ -74,7 +74,7 @@ sub _init {
     while (my $key = shift @_) {
         my $handler = shift @_;
         
-        my ($name,$spec) = ($key =~ /^([\w|-|\>]\w+|\<\>|)(\W.*|)/);
+        my ($name,$spec) = ($key =~ /^([\w|-|\>][\w|-]+|\<\>|)(\W.*|)/);
         if (not defined $name) {
             push @parse_errors,  __PACKAGE__ . " is unable to parse '$key' from spec!";
             next;
