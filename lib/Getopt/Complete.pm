@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.8');
+our $VERSION = qv('0.9');
 
 use Getopt::Complete::Options;
 use Getopt::Complete::Args;
@@ -14,7 +14,7 @@ our $ARGS;
 our %ARGS;
 
 our $EXIT_ON_ERRORS = 1;
-our $LONE_DASH_SUPPORT = 1;
+our $LONE_DASH_SUPPORT = 0;
 
 sub import {    
     my $class = shift;
@@ -60,7 +60,7 @@ sub import {
     $class->export_aliases($caller);
     
     # This is overridable externally.
-    unless ($EXIT_ON_ERRORS) {
+    if ($EXIT_ON_ERRORS) {
         if (my @errors = $ARGS->errors) {
             for my $error ($ARGS->errors) {
                 chomp $error;
@@ -96,7 +96,7 @@ Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.8.
+This document describes Getopt::Complete v0.9.
 
 =head1 SYNOPSIS
 
