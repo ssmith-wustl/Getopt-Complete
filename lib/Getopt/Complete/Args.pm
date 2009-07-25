@@ -315,10 +315,6 @@ sub resolve_possible_completions {
                 #push @possibilities, "--\t"
             }
         }
-
-        if (0) { #($is_option_name) {
-            @possibilities = map { '--' . $resolve_values_for_option_name . '=' . $_ } @possibilities;
-        }
     }
 
     my @matches = $self->reduce_possibilities_for_current_word($current,@possibilities);
@@ -460,6 +456,10 @@ sub translate_completions_for_shell_display {
                 # some partial completion will occur, continue passing the list so it can do that
             }
         }
+    }
+
+    for (@printable) {
+        s/ /\\ /g;
     }
 
     return @printable;
