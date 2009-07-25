@@ -74,7 +74,7 @@ sub _init {
     while (my $key = shift @_) {
         my $handler = shift @_;
         
-        my ($name,$spec) = ($key =~ /^([\w|-|\>]\w+|\<\>|)(\W.*|)/);
+        my ($name,$spec) = ($key =~ /^([\w|-|\>][\w|-]+|\<\>|)(\W.*|)/);
         if (not defined $name) {
             push @parse_errors,  __PACKAGE__ . " is unable to parse '$key' from spec!";
             next;
@@ -204,7 +204,7 @@ sub parse_completion_request {
         # we're starting to complete an empty word
         $current = '';
     }
-    my $previous = ( (@left and $left[-1] =~ /^--/) ? (pop @left) : ()) ;
+    my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--\w+=/) ? (pop @left) : ()) ;
     my @other_options = (@left,@right);
 
 
