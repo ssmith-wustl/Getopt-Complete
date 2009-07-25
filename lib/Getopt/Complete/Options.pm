@@ -204,7 +204,7 @@ sub parse_completion_request {
         # we're starting to complete an empty word
         $current = '';
     }
-    my $previous = ( (@left and $left[-1] =~ /^--/) ? (pop @left) : ()) ;
+    my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--\w+=/) ? (pop @left) : ()) ;
     my @other_options = (@left,@right);
 
 
