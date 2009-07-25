@@ -24,7 +24,7 @@ use Getopt::Complete (
     '<>'      => 'd',
 
     # CODE callbacks allow a the completion list to be dynamically resolved 
-    'fraggle' => sub { return ['rock','roll','fried fish','fries and squid'] },
+    'fraggle' => sub { return ['rock','roll','fried fish','fried taters','fries and squid'] },
 
     # support for Bash "compgen" builtins is present with some pre-made callbacks
     'myfile'    => \&Getopt::Complete::files,

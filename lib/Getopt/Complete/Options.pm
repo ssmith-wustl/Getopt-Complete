@@ -193,20 +193,38 @@ sub parse_completion_request {
         # parse error
         return;
     }
+ 
+    #use IO::File;
+    ## IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper('left',\@left,'right',\@right));
+    
 
     my $command = shift @left;
     my $current;
+    $left =~ s/\\ / /g;
     if (@left and $left[-1] eq substr($left,-1*length($left[-1]))) {
         # we're at the end of the final word in the @left list, and are trying to complete it
         $current = pop @left;
     }
     else {
         # we're starting to complete an empty word
+        #IO::File->new(">>/Users/ssmith/goclog")->print(
+        #    Data::Dumper::Dumper(
+        #        [
+        #            'last',
+        #            $left[-1],
+        #            'left',
+        #            $left,
+        #            'f', 
+        #            substr($left,-1*length($left[-1]))
+        #        ]
+        #    )
+        #);
         $current = '';
     }
     my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--[\w\-]+\=/) ? (pop @left) : ()) ;
     my @other_options = (@left,@right);
 
+    #IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper(['current',$current,'previous',$previous]));
 
     # it's hard to spot the case in which the previous word is "boolean", and has no value specified
     if ($previous) {
@@ -228,6 +246,9 @@ sub parse_completion_request {
         }
         
     }
+
+
+    #IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper(['current2',$current,'previous2',$previous]));
     return ($command,$current,$previous,\@other_options);
 }
 
