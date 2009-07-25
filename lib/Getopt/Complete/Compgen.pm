@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.8');
+our $VERSION = qv('0.9');
 
 # Support the shell-builtin completions.
 # Some hackery seems to be required to replicate regular file completion.
@@ -60,7 +60,7 @@ Getopt::Complete::Compgen - standard tab-completion callbacks
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Compgen v0.8.
+This document describes Getopt::Complete::Compgen v0.9.
 
 =head1 SYNOPSIS
 
