@@ -64,7 +64,7 @@ sub import {
         if (my @errors = $ARGS->errors) {
             for my $error ($ARGS->errors) {
                 chomp $error;
-                warn __PACKAGE__ . ' ERROR:' . $error . "\n";
+                warn __PACKAGE__ . ' ERROR: ' . $error . "\n";
             }
             exit 1;
         }
