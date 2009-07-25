@@ -60,7 +60,7 @@ sub import {
     $class->export_aliases($caller);
     
     # This is overridable externally.
-    unless ($EXIT_ON_ERRORS) {
+    if ($EXIT_ON_ERRORS) {
         if (my @errors = $ARGS->errors) {
             for my $error ($ARGS->errors) {
                 chomp $error;
