@@ -318,8 +318,7 @@ sub resolve_possible_completions {
     }
 
     my @matches = $self->reduce_possibilities_for_current_word($current,@possibilities);
-    my @printable_matches = $self->translate_completions_for_shell_display($current, @matches);
-    return @printable_matches;
+    return @matches;
 }
 
 sub reduce_possibilities_for_current_word {

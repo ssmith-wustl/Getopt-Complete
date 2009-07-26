@@ -152,7 +152,8 @@ sub handle_shell_completion {
         }
         my $args = Getopt::Complete::Args->new(options => $self, argv => $other);
         my @matches = $args->resolve_possible_completions($command,$current,$previous);
-        print join("\n",@matches),"\n";
+        my @printable_matches = $args->translate_completions_for_shell_display($current, @matches);
+        print join("\n",@printable_matches),"\n";
         exit;
     }
     return 1;
@@ -194,10 +195,6 @@ sub parse_completion_request {
         return;
     }
  
-    #use IO::File;
-    ## IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper('left',\@left,'right',\@right));
-    
-
     my $command = shift @left;
     my $current;
     $left =~ s/\\ / /g;
@@ -206,25 +203,10 @@ sub parse_completion_request {
         $current = pop @left;
     }
     else {
-        # we're starting to complete an empty word
-        #IO::File->new(">>/Users/ssmith/goclog")->print(
-        #    Data::Dumper::Dumper(
-        #        [
-        #            'last',
-        #            $left[-1],
-        #            'left',
-        #            $left,
-        #            'f', 
-        #            substr($left,-1*length($left[-1]))
-        #        ]
-        #    )
-        #);
         $current = '';
     }
     my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--[\w\-]+\=/) ? (pop @left) : ()) ;
     my @other_options = (@left,@right);
-
-    #IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper(['current',$current,'previous',$previous]));
 
     # it's hard to spot the case in which the previous word is "boolean", and has no value specified
     if ($previous) {
@@ -247,9 +229,15 @@ sub parse_completion_request {
         
     }
 
-
-    #IO::File->new(">>/Users/ssmith/goclog")->print(Data::Dumper::Dumper(['current2',$current,'previous2',$previous]));
-    return ($command,$current,$previous,\@other_options);
+    my $quote;
+    if ($current =~ /^([\'\"])/) {
+        $quote = $1;
+        $current = substr($current,1);
+        if (substr($current,-1,1) eq $quote and not substr($current,-2,1) eq '\\') {
+           $current = substr($current,0,length($current)-1); 
+        };
+    }
+    return ($command,$current,$previous,\@other_options, $quote);
 }
 
 
