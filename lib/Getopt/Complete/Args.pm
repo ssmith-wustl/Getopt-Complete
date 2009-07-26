@@ -167,7 +167,6 @@ sub _validate_values {
         }
         else {
             ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]+|\<\>|)(\W.*|)/);
-            #($dashes,$name,$spec) = ($key =~ /^(\-*)(\w+)(.*)/);
             if (not defined $name) {
                 print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
                 next;
@@ -185,10 +184,10 @@ sub _validate_values {
             if (ref($completions) eq 'CODE') {
                 # we pass in the value as the "completeme" word, so that the callback
                 # can be as optimal as possible in determining if that value is acceptable.
-                $completions = $completions->(undef,$value,$key,$self);
+                $completions = $completions->(undef,$value,$key,$self->{'values'});
                 if (not defined $completions or not ref($completions) eq 'ARRAY' or @$completions == 0) {
                     # if not, we give it the chance to give us the full list of options
-                    $completions = $self->completion_handler($key)->(undef,undef,$key,{});
+                    $completions = $self->completion_handler($key)->(undef,undef,$key,$self->{'values'});
                 }
             }
             unless (ref($completions) eq 'ARRAY') {
