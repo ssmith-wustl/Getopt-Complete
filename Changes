@@ -13,7 +13,7 @@ Revision history for Getopt-Complete
 0.7     
         This release dumps data to the screen when it runs.  It was removed from CPAN.
 
-0.6    
+0.6     2009-07-18 
         Sub-command tree support added.
 
 0.5     2009-07-18
