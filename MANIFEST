@@ -24,6 +24,5 @@ t/01-try-many.in
 t/boilerplate.t
 t/exercise.t
 t/myprogram
-t/myprogram2
 t/mytreeapp
 t/pod.t
