@@ -564,7 +564,7 @@ Returns the GetOptions specification for the parameter in question.
 
 Returns the arrayref or code ref which handles resolving valid completions.
 
-=items sub_commands
+=item sub_commands
 
 The list of sub-commands which are options at this level of a command tree.
 
