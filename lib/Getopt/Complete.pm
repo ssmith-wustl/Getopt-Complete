@@ -140,10 +140,15 @@ Thereafter in the terminal (after next login, or sourcing the updated .bashrc):
 
 =head1 DESCRIPTION
 
-This module makes it easy to add custom command-line completion to
-Perl applications.  It also makes using the shell arguments in the 
-program hassle-free as well, and does additional validation
-based on completion lists automatically.
+This module makes it easy to add custom command-line completion to Perl
+applications.  It also does additional validation of arguments, when the
+program is actually executed, based on completion lists.  
+
+Support is also present for apps which are an entry point for a hierarchy of
+sub-commands (in the style of cvs and git).
+
+Getopt::Complete also wraps the standard options processing and exports
+it as a %ARGS hash at compile time, making using the arguments hassle-free.
 
 The completion features currently work with the bash shell, which is 
 the default on most Linux and Mac systems.  Patches for other shells 
@@ -810,7 +815,7 @@ It does one of everything, besides command trees.
         '<>'      => ['some','raw','words'],
 
         # CODE callbacks allow a the completion list to be dynamically resolved 
-        'fraggle' => sub { return ['rock','roll'] },
+        'fraggle' => sub { return ['rock','roll','fried fish','fried taters','fries and squid'] },
 
         # callbacks get extra info to help them, including the part of the
         # word already typed, and the remainder of the options already processed for context
@@ -864,10 +869,14 @@ And is readily installable with the CPAN shell on Mac, Linux, and other Unix-lik
 
 =head1 BUGS
 
+Completions with whitespace work, but they do so by escaping whitespace characters instead of quoting.  
+Support should be present for completing quoted text.  It should also be the default, since it is
+more attractive.
+
 The logic to "shorten" the completion options shown in some cases is still in development. 
 This means that filename completion shows full paths as options instead of just the last word in the file path.
 
-Some uses of Getopt::Long will not work currently: multi-name options, +, :, %.
+Some uses of Getopt::Long will not work currently: multi-name options (though standard shortening works), +, :, %.
 
 Currently this module only supports bash, though other shells could be added easily.
 
