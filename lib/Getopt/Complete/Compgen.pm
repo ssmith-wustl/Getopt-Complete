@@ -33,13 +33,9 @@ for my $subname (qw/
         chomp @f;
         if ($option eq 'f' or $option eq 'd') {
             @f = map { -d $_ ? "$_/\t" : $_ } @f;
-            if (-d $value) {
-                push @f, [$value];
-                push @{$f[-1]},'-' if $Getopt::Complete::LONE_DASH_SUPPORT and $option eq 'f';
-            }
-            else {
-                push @f, ['-'] if $Getopt::Complete::LONE_DASH_SUPPORT and $option eq 'f';
-            }
+            my @not_shown = ($value);
+            push @f, \@not_shown;
+            push @not_shown, '-' if $Getopt::Complete::LONE_DASH_SUPPORT and $option eq 'f';
         }
         return \@f;
     };
