@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.10');
+our $VERSION = qv('0.11');
 
 use IPC::Open2;
 use Data::Dumper;

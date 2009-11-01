@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use version;
-our $VERSION = qv('0.10');
+our $VERSION = qv('0.11');
 
 # Support the shell-builtin completions.
 # Some hackery seems to be required to replicate regular file completion.
