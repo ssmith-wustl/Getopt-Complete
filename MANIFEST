@@ -25,4 +25,3 @@ t/boilerplate.t
 t/exercise.t
 t/myprogram
 t/mytreeapp
-t/pod.t
