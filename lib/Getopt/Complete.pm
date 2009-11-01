@@ -96,7 +96,7 @@ Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.10.
+This document describes Getopt::Complete v0.11.
 
 =head1 SYNOPSIS
 
@@ -911,7 +911,7 @@ the manual page for bash has lots of info on how tab-completion works
 
 =head1 COPYRIGHT
 
-Copyright 20.10 Scott Smith and Washington University School of Medicine
+Copyright 2010 Scott Smith and Washington University School of Medicine
 
 =head1 AUTHORS
 

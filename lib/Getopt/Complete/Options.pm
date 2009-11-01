@@ -249,7 +249,7 @@ Getopt::Complete::Options - a command-line options specification
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.10.
+This document describes Getopt::Complete v0.11.
 
 =head1 SYNOPSIS
 
@@ -297,7 +297,7 @@ L<Getopt::Complete>, L<Getopt::Complete::Args>, L<Getopt::Complete;:Compgen>
 
 =head1 COPYRIGHT
 
-Copyright 20.10 Scott Smith and Washington University School of Medicine
+Copyright 2010 Scott Smith and Washington University School of Medicine
 
 =head1 AUTHORS
 
