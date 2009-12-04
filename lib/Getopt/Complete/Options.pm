@@ -8,6 +8,7 @@ our $VERSION = qv('0.11');
 
 use IPC::Open2;
 use Data::Dumper;
+use Getopt::Complete::LazyOptions;
 
 sub new {
     my $class = shift;
@@ -104,10 +105,16 @@ sub _init {
         if (substr($name,0,1) eq '>') {
             # a "sub-command": make a sub-options tree, which may happen recursively
             my $word = substr($name,1);
-            unless (ref($handler) eq 'ARRAY') {
-                die "expected arrayref for $name value!";
+            if (ref($handler) eq 'ARRAY') {
+                $handler = Getopt::Complete::Options->new(@$handler);
             }
-            $handler = Getopt::Complete::Options->new(@$handler);
+            elsif (ref($handler) eq 'CODE' or ref($handler) eq 'SCALAR') {
+                # be lazy about actually resolving this               
+                $handler = Getopt::Complete::LazyOptions->new($handler);
+            }
+            else {
+                die "expected arrayref or code for $name value!";
+            }
             $handler->{command} = ($self->{command} || '') . " " . $word; 
             $completion_handlers->{$name} = $handler;
             push @{ $self->{sub_commands} }, $word;
