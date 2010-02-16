@@ -59,3 +59,27 @@ sub AUTOLOAD {
 
 1;
 
+=pod
+
+=head1 NAME
+
+Getopt::Complete::LazyOptions - internal object used as a placeholder for unprocessed options
+
+=head1 SYNOPSIS
+
+    use Getopt::Complete (
+        "foo=n" => [11,22,33],
+        "bar=s" => "f",
+        ">"     =>  sub {
+                        my $values = [];
+                        # code to generate completions for this option here...
+                        return $values;
+                    }
+    );
+
+=head1 DESCRIPTION
+
+This class is used internally by Getopt::Complete::Options. 
+
+=cut
+
