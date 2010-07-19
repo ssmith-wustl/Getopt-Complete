@@ -7,13 +7,14 @@ our $cache_path;
 our $cache_is_stale;
 
 sub import {
-    my $this_module = shift;
+    my $self = shift;
     my %args = @_;
 
-
-    my $file  = delete $args{file} if exists $args{file};
-
     my $class = delete $args{class};
+    my $file  = delete $args{file}  if exists $args{file};
+    my $above = 0; $above = delete $args{above} if exists $args{above};
+    my $dynamic_caching = 0; $dynamic_caching = delete $args{dynamic_caching} if exists $args{dynamic_caching};
+    my $comp_line = $ENV{COMP_LINE}; $comp_line = delete $args{comp_line} if exists $args{comp_line};
 
     if (%args) {
         require Data::Dumper;
@@ -25,22 +26,16 @@ sub import {
         die __PACKAGE__ . " received both a class and file param: $class, $file!";
     }
 
-    return unless ($ENV{COMP_LINE});
+    return unless ($comp_line);
 
+    # doesn't detect
     my $module_path;
     if ($class) {
-        ($module_path,$cache_path) = _module_and_cache_paths_for_package($class);
+        ($module_path, $cache_path) = $self->module_and_cache_paths_for_package($class, $above);
         $cache_path ||= $module_path . '.opts';
     }
-    else {
-        use FindBin;
-        $module_path = $FindBin::RealBin . '/' . $FindBin::RealScript;
-        $cache_path = $file || $module_path . '.opts';
-    }
-
-    #print STDERR ">> mod $module_path class $cache_path\n";
-
-    if (-e $cache_path) {
+    
+    if ($dynamic_caching && -e $cache_path) {
         my $my_mtime = (stat($module_path))[9];
 
         # if the module has a directory with changes newer than the module,
@@ -59,36 +54,59 @@ sub import {
             unlink $cache_path;
         }
     }
-
+    
     if ($cache_path and -e $cache_path) {
         my $fh;
-        open($fh,$cache_path);
+        open($fh, $cache_path);
         if ($fh) {
-            my $src = join('',<$fh>);
+            my $src = join('', <$fh>);
             require Getopt::Complete;
             my $spec = eval $src;
             if ($spec) {
                 Getopt::Complete->import(@$spec);
             }
         }
+        return 1;
+    }
+    else {
+        print "Unable to open file: $cache_path\n";
+        return 0;
     }
 }
 
-sub _module_and_cache_paths_for_package {
+sub module_and_cache_paths_for_package {
+    my $self = shift;
     my $class = shift;
+    my $above = shift;
     my $path = $class;
     $path =~ s/::/\//g;
     $path = '/' . $path . '.pm';
     
-    my (@mod_paths) = map { ($_ . $path) } @INC;
-    my (@cache_paths) = map { ($_ . $path . '.opts' ) } @INC;
+    my ($mod_path, $opt_path);
     
-    my ($module_path, $cache_path);
-    ($module_path) = grep { -e $_ } @mod_paths;
-    #($cache_path) = grep { -e $_ } @cache_paths;
-    $cache_path = $module_path . '.opts';
+    # if above, check cwd upwards for class location
+    if ($above) {
+        require Cwd;
+        $mod_path = Cwd::cwd();
+        $mod_path =~ s/([^\/])$/$1\//;
+        until (-e "$mod_path$path" || $mod_path eq '/') {
+            $mod_path =~ s/[^\/]+\/$//; # remove last folder and try again
+        }
+        $mod_path .= $path;
+        $opt_path = $mod_path . '.opts';
+    }
+    
+    # otherwise search perl's path
+    unless ($mod_path && -e "$mod_path") {
+        my (@mod_paths) = map { ($_ . $path) } @INC;
+        ($mod_path) = grep { -e $_ } @mod_paths;    
+    }
+    unless ($opt_path && -e "$opt_path") {
+        my (@opt_paths) = map { ($_ . $path . '.opts' ) } @INC;
+        ($opt_path) = grep { -e $_ } @opt_paths;
+    }
 
-    return ($module_path, $cache_path);
+    return ($mod_path, $opt_path);
 }
 
 sub generate {
@@ -141,7 +159,7 @@ sub generate {
                             no strict;
                             no warnings;
                             $spec = ${ $class . '::OPTS_SPEC' };
-                            my ($other_module_path,$other_cache_path) = _module_and_cache_paths_for_package($module);
+                            my ($other_module_path,$other_cache_path) = $self->module_and_cache_paths_for_package($module);
                             $other_cache_path ||= $other_module_path . '.opts';
                             my $fh;
                             open($fh,$other_cache_path);
