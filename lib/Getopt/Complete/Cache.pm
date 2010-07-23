@@ -30,11 +30,18 @@ sub import {
 
     # doesn't detect
     my $module_path;
+
     if ($class) {
         ($module_path, $cache_path) = $self->module_and_cache_paths_for_package($class, $above);
         $cache_path ||= $module_path . '.opts';
     }
+    else {
+        use FindBin;
+        $module_path = $FindBin::RealBin . '/' . $FindBin::RealScript;
+        $cache_path = $file || $module_path . '.opts';
+    }
     
+    # TODO: This does not quite work yet.
     if ($dynamic_caching && -e $cache_path) {
         my $my_mtime = (stat($module_path))[9];
 
