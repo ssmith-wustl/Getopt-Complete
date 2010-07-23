@@ -55,6 +55,9 @@ sub import {
         }
     }
     
+    $cache_path = $file if ($file);
+    
+    
     if ($cache_path and -e $cache_path) {
         my $fh;
         open($fh, $cache_path);
