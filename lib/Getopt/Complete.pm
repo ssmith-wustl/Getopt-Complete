@@ -908,6 +908,7 @@ Copyright 2010 Scott Smith and Washington University School of Medicine
 =head1 AUTHORS
 
 Scott Smith (sakoht at cpan .org)
+Nathan Nutter
 
 =head1 LICENSE
 

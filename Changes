@@ -1,5 +1,10 @@
 Revision history for Getopt-Complete
 
+0.13    2010-07-23
+        Added LazyOptions and Cache for improved handling of nested commands.
+        Refactored for testability.
+        Added stricter failing when cant read opts file.
+
 0.11    2009-11-01
         Removed the pod test which breaks automatic installs via the CPAN shell.
 
