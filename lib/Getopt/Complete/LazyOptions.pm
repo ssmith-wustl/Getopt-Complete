@@ -31,7 +31,7 @@ sub AUTOLOAD {
             $spec = eval $data;
         }
         else {
-            print STDERR ">> redo $class!\n";
+#            print STDERR ">> redo $class!\n";
             local $ENV{GETOPT_COMPLETE_CACHE} = 1;
             eval "use $class";
             die $@ if $@;
