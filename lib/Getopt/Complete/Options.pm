@@ -158,8 +158,12 @@ sub handle_shell_completion {
             exit;
         }
         my $args = Getopt::Complete::Args->new(options => $self, argv => $other);
-        my @matches = $args->resolve_possible_completions($command,$current,$previous);
-        my @printable_matches = $args->translate_completions_for_shell_display($current, @matches);
+        my @matches;
+        my @printable_matches;
+        unless ($args->errors) {
+            @matches = $args->resolve_possible_completions($command,$current,$previous);
+            @printable_matches = $args->translate_completions_for_shell_display($current, @matches);
+        }
         print join("\n",@printable_matches),"\n";
         exit;
     }
