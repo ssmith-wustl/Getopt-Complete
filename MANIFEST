@@ -24,6 +24,9 @@ README
 t/00-load.t
 t/01-try-many.in
 t/boilerplate.t
+t/demoapp
+t/demoapp.opts
+t/demoapp_completion.t
 t/exercise.t
 t/myprogram
 t/mytreeapp
