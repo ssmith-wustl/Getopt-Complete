@@ -1,5 +1,9 @@
 Revision history for Getopt-Complete
 
+0.14    2010-09-09
+        Fixed bug that returned completion results even when various errors were encountered.
+        Added t/demoapp*, a test to validate some basic tab completion results.
+
 0.13    2010-07-23
         Added LazyOptions and Cache for improved handling of nested commands.
         Refactored for testability.
