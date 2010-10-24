@@ -5,10 +5,12 @@ use warnings;
 
 use Test::More;
 use FindBin;
-my $path = $FindBin::Bin . '/demoapp';
+
+local $ENV{PATH} = $FindBin::Bin . ':' . $ENV{PATH};
+my $path = 'demoapp';
 plan tests => 9;
 
-ok(-e $path, "found the demo program ($path)");
+ok(-e $FindBin::Bin . '/' . $path, "found the demo program ($path)");
 ok(test_completion("$path model build ") > 0, 'results for valid sub-command');
 ok(test_completion("$path model buil") > 0, 'results for valid partial sub-command');
 ok(test_completion("$path projectx ") == 0, 'no results for bad sub-command');
