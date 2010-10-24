@@ -1,5 +1,9 @@
 Revision history for Getopt-Complete
 
+0.15    2010-10-24
+        Fixed a failing test with a bad perl interpreter path for the demoapp.
+        Fixed a bug with running tests on a machine with a space in the path to the files.
+        
 0.14    2010-09-09
         Fixed bug that returned completion results even when various errors were encountered.
         Added t/demoapp*, a test to validate some basic tab completion results.
