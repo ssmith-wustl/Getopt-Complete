@@ -33,8 +33,7 @@ for my $subname (qw/
         chomp @f;
         if ($option eq 'f' or $option eq 'd') {
             # bash is fine with ~/ paths but perl is not, need to translate
-            my $username = getlogin();
-            my $home_dir = (getpwnam($username))[7];
+            my $home_dir = (getpwuid($<))[7];
             for (my $i = 0; $i < @f; $i++) {
                 my $perl_path = $f[$i];
                 $perl_path =~ s/^~/$home_dir/;
