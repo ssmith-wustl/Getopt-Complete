@@ -215,7 +215,7 @@ sub parse_completion_request {
     my $command = shift @left;
     my $current;
     $left =~ s/\\ / /g;
-    if (@left and $left[-1] eq substr($left,-1*length($left[-1]))) {
+    if (substr($left, -1) ne ' ') {
         # we're at the end of the final word in the @left list, and are trying to complete it
         $current = pop @left;
     }
