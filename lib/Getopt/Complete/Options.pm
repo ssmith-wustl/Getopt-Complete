@@ -181,7 +181,13 @@ sub _line_to_argv {
     my $result = join("",<$reader>);
     no strict; no warnings;
     my $array = eval $result;
-    return @$array;
+    my @array = @$array;
+
+    # We don't want to expand ~ for user experience
+    my $home_dir = (getpwuid($<))[7];
+    @array = map { $_ =~ s/^$home_dir/\~/; $_ } @array;
+
+    return @array;
 }
 
 sub parse_completion_request {
