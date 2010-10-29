@@ -198,6 +198,7 @@ sub parse_completion_request {
     my $left = substr($comp_line,0,$comp_point);
     my @left = _line_to_argv($left);
 
+    # TODO: does this ever fire?
     if (@left and my $delegate = $self->completion_handler('>' . $left[0])) {
         # the first word matches a sub-command for this command
         # delegate to the options object for that sub-command, which
@@ -224,6 +225,7 @@ sub parse_completion_request {
     }
     $left =~ s/\\ / /g;
     my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--[\w\-]+\=/) ? (pop @left) : ()) ;
+    # TODO: this might be a good spot to make sure we don't complete a new sub-command
     my @other_options = (@left,@right);
 
     # it's hard to spot the case in which the previous word is "boolean", and has no value specified
