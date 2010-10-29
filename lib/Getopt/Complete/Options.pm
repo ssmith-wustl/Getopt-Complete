@@ -215,14 +215,14 @@ sub parse_completion_request {
  
     my $command = shift @left;
     my $current;
-    $left =~ s/\\ / /g;
-    if (substr($left, -1) ne ' ') {
+    if (substr($left, -1) ne ' ' || substr($left, -2) eq '\ ') {
         # we're at the end of the final word in the @left list, and are trying to complete it
         $current = pop @left;
     }
     else {
         $current = '';
     }
+    $left =~ s/\\ / /g;
     my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--[\w\-]+\=/) ? (pop @left) : ()) ;
     my @other_options = (@left,@right);
 
