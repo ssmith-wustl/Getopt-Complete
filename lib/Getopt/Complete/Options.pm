@@ -183,7 +183,8 @@ sub _line_to_argv {
     my $array = eval $result;
     my @array = @$array;
 
-    # We don't want to expand ~ for user experience
+    # We don't want to expand ~ for user experience and to be consistent with
+    # Bash's behavior for tab completion (as opposed to expansion of ARGV).
     my $home_dir = (getpwuid($<))[7];
     @array = map { $_ =~ s/^$home_dir/\~/; $_ } @array;
 
