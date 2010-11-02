@@ -1,5 +1,9 @@
 Revision history for Getopt-Complete
 
+0.16    2010-11-02
+        Fixed bug in completing paths beginning with ~
+        Better support for params that are expanded by Bash
+
 0.15    2010-10-24
         Fixed a failing test with a bad perl interpreter path for the demoapp.
         Fixed a bug with running tests on a machine with a space in the path to the files.
