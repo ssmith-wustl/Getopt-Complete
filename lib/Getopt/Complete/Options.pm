@@ -198,12 +198,12 @@ sub parse_completion_request {
     my $left = substr($comp_line,0,$comp_point);
     my @left = _line_to_argv($left);
 
-    # TODO: does this ever fire?
-    if (@left and my $delegate = $self->completion_handler('>' . $left[0])) {
-        # the first word matches a sub-command for this command
-        # delegate to the options object for that sub-command, which
-        # may happen recursively
-        return $delegate->parse_completion_request(@_);
+    # find options for last sub-command if it has a completion handler
+    # skipping first command but old code didn't but it also never seemed to trigger before
+    my @sub_cmds = @left[1..$#left];
+    while (@sub_cmds and my $delegate = $self->completion_handler('>' . $sub_cmds[0])) {
+        shift @sub_cmds;
+        $self = $delegate;
     }
 
     my $right = substr($comp_line,$comp_point);
