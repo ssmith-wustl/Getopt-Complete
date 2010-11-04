@@ -1,5 +1,8 @@
 package Getopt::Complete::Cache;
 
+use version;
+our $VERSION = qv('0.16');
+
 use strict;
 use warnings;
 
@@ -196,6 +199,10 @@ sub generate {
 =head1 NAME
 
 Getopt::Complete::Cache - cache options next-to the command they apply-to
+
+=head1 VERSION
+
+This document describes Getopt::Complete::Cache v0.16.
 
 =head1 SYNOPSIS
 
