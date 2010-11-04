@@ -123,6 +123,9 @@ sub _init {
         if (!$retval and @errors == 0) {
             push @errors, "unknown error processing arguments!";
         }
+        # we want to allow unknown option if the user puts them in, we just
+        # didn't help complete it
+        @errors = grep { $_ !~ /^Unknown option:/ } @errors;
     };
 
     if (@ARGV) {
@@ -131,8 +134,12 @@ sub _init {
             push @$a, @ARGV;
         }
         else {
-            for my $arg (@ARGV) {
-                push @errors, "unexpected unnamed arguments: $arg";
+            # in order to allow bare-args we only block unexpected arguments
+            # for commands with sub-commands
+            if ( $self->sub_commands ) {
+                for my $arg (@ARGV) {
+                    push @errors, "unexpected sub-command: $arg";
+                }
             }
         }
     }
@@ -274,7 +281,7 @@ sub resolve_possible_completions {
                 # using the --key=value syntax..
                 my ($option,$value) = ($1,$2);
                 @possibilities = $self->reduce_possibilities_for_current_word('--' . $option, @possibilities);
-                if (@possibilities == 1 and length($current) >= $possibilities[0]) {
+                if (!@possibilities || @possibilities == 1 and length($current) >= $possibilities[0]) {
                     # the key portion is complete
                     # continue below as though were were doing a regular value completion
                     $resolve_values_for_option_name = $option;
@@ -301,9 +308,12 @@ sub resolve_possible_completions {
             }
             @possibilities = @$handler;
         }
+        elsif ($resolve_values_for_option_name && !$self->sub_commands) {
+            my $handler = Getopt::Complete::files->($command,$current,$previous,$all);
+            @possibilities = @$handler;
+        }
         else {
             # no possibilities
-            # print STDERR "recvd: " . join(',',@_) . "\n";
             @possibilities = ();
         }
 
