@@ -1,5 +1,9 @@
 Revision history for Getopt-Complete
 
+0.17    2010-11-04
+        Support for completing bareargs as files.
+        Support for completing unknown options as files.
+
 0.16    2010-11-02
         Fixed bug in completing paths beginning with ~
         Better support for params that are expanded by Bash

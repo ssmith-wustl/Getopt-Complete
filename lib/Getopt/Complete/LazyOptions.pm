@@ -1,7 +1,7 @@
 package Getopt::Complete::LazyOptions;
 
 use version;
-our $VERSION = qv('0.16');
+our $VERSION = qv('0.17');
 
 our $AUTOLOAD;
 
@@ -69,7 +69,7 @@ Getopt::Complete::LazyOptions - internal object used as a placeholder for unproc
 
 =head1 VERSION
 
-This document describes Getopt::Complete::LazyOptions v0.16.
+This document describes Getopt::Complete::LazyOptions v0.17.
 
 =head1 SYNOPSIS
 

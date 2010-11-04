@@ -1,7 +1,7 @@
 package Getopt::Complete::Cache;
 
 use version;
-our $VERSION = qv('0.16');
+our $VERSION = qv('0.17');
 
 use strict;
 use warnings;
@@ -202,7 +202,7 @@ Getopt::Complete::Cache - cache options next-to the command they apply-to
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Cache v0.16.
+This document describes Getopt::Complete::Cache v0.17.
 
 =head1 SYNOPSIS
 
