@@ -96,7 +96,7 @@ Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
-This document describes Getopt::Complete v0.17.
+This document describes Getopt::Complete 0.17.
 
 =head1 SYNOPSIS
 

@@ -489,7 +489,7 @@ Getopt::Complete::Args - a set of option/value pairs
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Args v0.17.
+This document describes Getopt::Complete::Args 0.17.
 
 =head1 SYNOPSIS
 
