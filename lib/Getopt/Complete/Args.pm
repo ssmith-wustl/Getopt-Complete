@@ -229,7 +229,7 @@ sub resolve_possible_completions {
 
     my @possibilities;
 
-    my ($dashes,$resolve_values_for_option_name) = ($previous =~ /^(--)(.*)/); 
+    my ($dashes,$resolve_values_for_option_name) = ($previous =~ /^(-{1,2})(.*)/); 
     my $is_option_name = 0;
     if (not length $previous) {
         # no specific option is before this: a sub-command, a bare argument, or an option name
@@ -277,7 +277,7 @@ sub resolve_possible_completions {
                 # already showing the complete list
                 push @possibilities, "--no-\t";
             }
-            if ($current =~ /--(.+?)=(.*)/) {
+            if ($current =~ /-{1,2}(.+?)=(.*)/) {
                 # using the --key=value syntax..
                 my ($option,$value) = ($1,$2);
                 @possibilities = $self->reduce_possibilities_for_current_word('--' . $option, @possibilities);

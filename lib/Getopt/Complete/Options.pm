@@ -224,7 +224,7 @@ sub parse_completion_request {
         $current = '';
     }
     $left =~ s/\\ / /g;
-    my $previous = ( (@left and $left[-1] =~ /^--/ and not $left[-1] =~ /^--[\w\-]+\=/) ? (pop @left) : ()) ;
+    my $previous = ( (@left and $left[-1] =~ /^-{1,2}/ and not $left[-1] =~ /^-{1,2}[\w\-]+\=/) ? (pop @left) : ()) ;
     # TODO: this might be a good spot to make sure we don't complete a new sub-command
     my @other_options = (@left,@right);
 
