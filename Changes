@@ -1,6 +1,7 @@
 Revision history for Getopt-Complete
 
 0.17    2010-11-04
+        Fixed bug in parse_completion_request that was preventing detection of boolean options
         Support for completing bareargs as files.
         Support for completing unknown options as files.
 
