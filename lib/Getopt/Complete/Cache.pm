@@ -67,14 +67,14 @@ sub import {
     
     $cache_path = $file if ($file);
     
-    if ($cache_path and -e $cache_path) {
+    if ( -f $cache_path && -s $cache_path) {
         my $fh;
         open($fh, $cache_path);
         if ($fh) {
             my $src = join('', <$fh>);
             require Getopt::Complete;
             my $spec = eval $src;
-            if ($spec) {
+            if (@$spec) {
                 Getopt::Complete->import(@$spec);
             }
         }
