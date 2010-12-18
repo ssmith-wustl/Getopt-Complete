@@ -11,7 +11,6 @@ all_from 'lib/Getopt/Complete.pm';
 requires 'Getopt::Long';
 requires 'Scalar::Util';
 requires 'IPC::Open2';
-requires 'version';
 requires 'Carp';
 
 # things the tests need
