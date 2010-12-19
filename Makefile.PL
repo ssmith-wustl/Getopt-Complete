@@ -8,12 +8,14 @@ license 'perl';
 all_from 'lib/Getopt/Complete.pm';
 
 # prereqs
+requires 'version';
 requires 'Getopt::Long';
 requires 'Scalar::Util';
 requires 'IPC::Open2';
 requires 'Carp';
 
 # things the tests need
+build_requires 'version';
 build_requires 'Test::More' => '0.86';
 build_requires 'App::Prove';
 
