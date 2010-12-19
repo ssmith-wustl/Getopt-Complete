@@ -3,7 +3,7 @@ package Getopt::Complete::Compgen;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = $Getopt::Complete::VERSION;
 
 # Support the shell-builtin completions.
 # Some hackery seems to be required to replicate regular file completion.

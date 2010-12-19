@@ -3,7 +3,8 @@ package Getopt::Complete;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+use version;
+our $VERSION = qv('0.19');
 
 use Getopt::Complete::Options;
 use Getopt::Complete::Args;

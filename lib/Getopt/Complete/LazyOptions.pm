@@ -1,6 +1,6 @@
 package Getopt::Complete::LazyOptions;
 
-our $VERSION = '0.18';
+our $VERSION = $Getopt::Complete::VERSION;
 
 our $AUTOLOAD;
 

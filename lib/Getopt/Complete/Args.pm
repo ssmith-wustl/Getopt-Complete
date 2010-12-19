@@ -3,7 +3,7 @@ package Getopt::Complete::Args;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = $Getopt::Complete::VERSION;
 
 use Getopt::Long;
 use Scalar::Util;

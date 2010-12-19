@@ -1,6 +1,6 @@
 package Getopt::Complete::Cache;
 
-our $VERSION = '0.18';
+our $VERSION = $Getopt::Complete::VERSION;
 
 use strict;
 use warnings;

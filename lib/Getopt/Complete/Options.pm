@@ -3,7 +3,7 @@ package Getopt::Complete::Options;
 use strict;
 use warnings;
 
-our $VERSION = '0.18';
+our $VERSION = $Getopt::Complete::VERSION;
 
 use IPC::Open2;
 use Data::Dumper;
