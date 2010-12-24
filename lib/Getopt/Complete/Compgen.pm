@@ -64,7 +64,7 @@ Getopt::Complete::Compgen - standard tab-completion callbacks
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Compgen 0.18.
+This document describes Getopt::Complete::Compgen 0.20.
 
 =head1 SYNOPSIS
 
