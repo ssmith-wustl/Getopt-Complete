@@ -259,6 +259,7 @@ sub parse_completion_request {
     return ($command,$current,$previous,\@other_options, $quote);
 }
 
+1;
 
 =pod 
 
