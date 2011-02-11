@@ -128,7 +128,7 @@ sub _init {
     };
 
     if (@ARGV) {
-        if ($self->options->completion_handler('<>')) {
+        if ($self->options->has_option('<>')) {
             my $a = $values{'<>'} ||= [];
             push @$a, @ARGV;
         }
