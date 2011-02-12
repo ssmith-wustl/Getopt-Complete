@@ -1,14 +1,6 @@
 Changes
 doc/getopt-complete.odp
 doc/getopt-complete.pdf
-inc/Module/Install.pm
-inc/Module/Install/Base.pm
-inc/Module/Install/Can.pm
-inc/Module/Install/Fetch.pm
-inc/Module/Install/Makefile.pm
-inc/Module/Install/Metadata.pm
-inc/Module/Install/Win32.pm
-inc/Module/Install/WriteAll.pm
 INSTALL
 lib/Getopt/Complete.pm
 lib/Getopt/Complete/Args.pm
@@ -17,7 +9,7 @@ lib/Getopt/Complete/Compgen.pm
 lib/Getopt/Complete/LazyOptions.pm
 lib/Getopt/Complete/Options.pm
 LICENSE
-Makefile.PL
+Build.PL
 MANIFEST			This list of files
 META.yml
 README
