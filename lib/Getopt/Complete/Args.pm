@@ -128,7 +128,7 @@ sub _init {
     };
 
     if (@ARGV) {
-        if ($self->options->completion_handler('<>')) {
+        if ($self->options->has_option('<>')) {
             my $a = $values{'<>'} ||= [];
             push @$a, @ARGV;
         }
@@ -488,7 +488,7 @@ Getopt::Complete::Args - a set of option/value pairs
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Args 0.20.
+This document describes Getopt::Complete::Args 0.21.
 
 =head1 SYNOPSIS
 

@@ -1,5 +1,10 @@
 Revision history for Getopt-Complete
 
+0.21    2011-01-12
+        Patch from  Andrei Benea (abenea@github) fixing bug with all bare arguments.
+        Fix to the demoapp test.
+        Switch to Build.PL instead of Makefile.PL so we can install on Mac w/o xcode.
+
 0.20    2010-11-24
         Updates to cache logic.
         Replacement for 0.19 which failed to compile.

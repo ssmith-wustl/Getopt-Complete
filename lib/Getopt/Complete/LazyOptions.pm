@@ -68,7 +68,7 @@ Getopt::Complete::LazyOptions - internal object used as a placeholder for unproc
 
 =head1 VERSION
 
-This document describes Getopt::Complete::LazyOptions 0.20.
+This document describes Getopt::Complete::LazyOptions 0.21.
 
 =head1 SYNOPSIS
 
