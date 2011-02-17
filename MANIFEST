@@ -14,9 +14,7 @@ MANIFEST			This list of files
 META.yml
 README
 t/00-load.t
-t/01-try-many.expected
 t/01-try-many.in
-t/01-try-many.out
 t/01-try-many.t
 t/02-boilerplate.t
 t/03-demoapp-completion.t
