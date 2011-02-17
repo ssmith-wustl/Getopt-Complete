@@ -122,9 +122,11 @@ sub _init {
         if (!$retval and @errors == 0) {
             push @errors, "unknown error processing arguments!";
         }
-        # we want to allow unknown option if the user puts them in, we just
-        # didn't help complete it
-        @errors = grep { $_ !~ /^Unknown option:/ } @errors;
+        if ($ENV{COMP_LINE}) {
+            # we want to allow unknown option if the user puts them in, we just
+            # didn't help complete it
+            @errors = grep { $_ !~ /^Unknown option:/ } @errors;
+        }
     };
 
     if (@ARGV) {

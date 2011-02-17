@@ -903,12 +903,13 @@ the manual page for bash has lots of info on how tab-completion works
 
 =head1 COPYRIGHT
 
-Copyright 2010 Scott Smith and Washington University School of Medicine
+Copyright 2010, 2011 Washington University School of Medicine
 
 =head1 AUTHORS
 
 Scott Smith (sakoht at cpan .org)
 Nathan Nutter
+Andrei Benea
 
 =head1 LICENSE
 

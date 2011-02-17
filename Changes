@@ -1,5 +1,8 @@
 Revision history for Getopt-Complete
 
+0.22    2011-01-16
+        Another atch from  Andrei Benea (abenea@github) fixing bug with nonsense argument not generating an error.
+        
 0.21    2011-01-12
         Patch from  Andrei Benea (abenea@github) fixing bug with all bare arguments.
         Fix to the demoapp test.
