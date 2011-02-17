@@ -201,7 +201,7 @@ Getopt::Complete::Cache - cache options next-to the command they apply-to
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Cache 0.21.
+This document describes Getopt::Complete::Cache 0.22.
 
 =head1 SYNOPSIS
 
