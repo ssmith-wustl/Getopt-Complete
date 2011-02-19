@@ -4,7 +4,7 @@ author: []
 build_requires:
   App::Prove: ''
   Test::More: 0.86
-  version: 0.74
+  version: 0.88
 configure_requires:
   Module::Build: 0.36
 generated_by: 'Module::Build version 0.3607'
@@ -38,7 +38,7 @@ requires:
   IPC::Open2: ''
   Scalar::Util: ''
   perl: v5.8.7
-  version: 0.74
+  version: 0.88
 resources:
   license: http://dev.perl.org/licenses/
 version: v0.23.0

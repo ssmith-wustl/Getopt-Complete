@@ -9,14 +9,14 @@ my $build = Module::Build->new(
   license => 'perl',
   requires => {
     'perl'              => 'v5.8.7',
-    'version'           => '0.74',
+    'version'           => '0.88',
     'Getopt::Long'      => '',
     'Scalar::Util'      => '',
     'IPC::Open2'        => '',
     'Carp'              => '',
   },
   build_requires => {
-    'version'           => '0.74',
+    'version'           => '0.88',
     'Test::More'        => '0.86',
     'App::Prove'        => '',
   },
