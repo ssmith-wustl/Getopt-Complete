@@ -9,17 +9,16 @@ my $build = Module::Build->new(
   license => 'perl',
   requires => {
     'perl'              => 'v5.8.7',
-    'version'           => '',
+    'version'           => '0.74',
     'Getopt::Long'      => '',
     'Scalar::Util'      => '',
     'IPC::Open2'        => '',
     'Carp'              => '',
   },
   build_requires => {
-    'version'           => '',
+    'version'           => '0.74',
     'Test::More'        => '0.86',
     'App::Prove'        => '',
-
   },
   cpan_client => 'cpanm',
   #script_files => [ 'bin/ur' ],

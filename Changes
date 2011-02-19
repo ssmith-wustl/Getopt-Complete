@@ -1,5 +1,8 @@
 Revision history for Getopt-Complete
 
+0.23    2011-01-19
+        Updated build logic to prevent installation with out a recent version.pm
+
 0.22    2011-01-16
         Another atch from  Andrei Benea (abenea@github) fixing bug with nonsense argument not generating an error.
         
