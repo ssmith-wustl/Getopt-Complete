@@ -4,7 +4,6 @@ author: []
 build_requires:
   App::Prove: ''
   Test::More: 0.86
-  version: 0.88
 configure_requires:
   Module::Build: 0.36
 dynamic_config: 0
@@ -17,7 +16,7 @@ name: Getopt-Complete
 provides:
   Getopt::Complete:
     file: lib/Getopt/Complete.pm
-    version: v0.23.0
+    version: 0.24
   Getopt::Complete::Args:
     file: lib/Getopt/Complete/Args.pm
     version: 0
@@ -39,7 +38,6 @@ requires:
   IPC::Open2: ''
   Scalar::Util: ''
   perl: v5.8.7
-  version: 0.88
 resources:
   license: http://dev.perl.org/licenses/
-version: v0.23.0
+version: 0.24
