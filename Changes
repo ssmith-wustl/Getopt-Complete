@@ -1,5 +1,8 @@
 Revision history for Getopt-Complete
 
+0.24    2011-03-02
+        The "version" module makes this difficult to install.  Switching to simple text version "0.24".
+
 0.23    2011-01-19
         Updated build logic to prevent installation with out a recent version.pm
 
