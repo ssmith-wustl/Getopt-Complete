@@ -3,7 +3,7 @@ package Getopt::Complete;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Getopt::Complete::Options;
 use Getopt::Complete::Args;
@@ -95,7 +95,7 @@ Getopt::Complete - programmable shell completion for Perl apps
 
 =head1 VERSION
 
-This document describes Getopt::Complete 0.24.
+This document describes Getopt::Complete 0.25.
 
 =head1 SYNOPSIS
 

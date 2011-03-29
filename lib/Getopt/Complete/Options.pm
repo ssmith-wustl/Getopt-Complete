@@ -126,7 +126,7 @@ sub _init {
         }
         if ($name eq '-') {
             if ($spec and $spec ne '!') {
-                push @parse_errors,  __PACKAGE__ . " $key errors: $name is implicitly boolean!";
+                push @parse_errors,  __PACKAGE__ . " $key errors: $name is implicitly stand-alone!";
             }
             $spec ||= '!';
         }
@@ -269,7 +269,7 @@ Getopt::Complete::Options - a command-line options specification
 
 =head1 VERSION
 
-This document describes Getopt::Complete 0.24
+This document describes Getopt::Complete 0.25
 
 =head1 SYNOPSIS
 

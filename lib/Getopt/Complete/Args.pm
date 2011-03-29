@@ -166,19 +166,28 @@ sub _validate_values {
 
     my @failed;
     for my $key (keys %{ $self->options->{completion_handlers} }) {
-        my $completions = $self->options->completion_handler($key);
-
-        my ($dashes,$name,$spec);
-        if ($key eq '<>') {
-            $name = '<>',
-            $spec = '=s@';
+        my $completion_handler= $self->options->completion_handler($key);
+        my $completions;
+        if (ref($completion_handler) eq 'CODE') {
+            # defer setting $completions
+        }
+        elsif (ref($completion_handler) eq 'ARRAY') {
+            $completions = $completion_handler;
+            $completion_handler = undef;
         }
         else {
-            ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]+|\<\>|)(\W.*|)/);
-            if (not defined $name) {
-                print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
-                next;
-            }
+            #warn "unexpected completion specification for $key: $completion_handler???";
+            next;
+        }
+
+        my ($name,$spec) = ($key =~ /^([\w|-|\>][\w|-]*|\<\>|)(\W.*|)/);
+        #my ($dashes,$name,$spec) = ($key =~ /^(\-*?)([\w|-]*|\<\>|)(\W.*|)/);
+        if (not defined $name) {
+            print STDERR "key $key is unparsable in " . __PACKAGE__ . " spec inside of $0 !!!";
+            next;
+        }
+        if ($name eq '<>' and not $spec) {
+            $spec = '=s@';
         }
 
         my $value_returned = $self->value($name);
@@ -189,18 +198,18 @@ sub _validate_values {
             next if not defined $value;
             next if not defined $completions;
             my @valid_values_shown_in_message;
-            if (ref($completions) eq 'CODE') {
+            if ($completion_handler) {
                 # we pass in the value as the "completeme" word, so that the callback
                 # can be as optimal as possible in determining if that value is acceptable.
-                $completions = $completions->(undef,$value,$key,$self->{'values'});
+                $completions = $completion_handler->(undef,$value,$key,$self->{'values'});
                 if (not defined $completions or not ref($completions) eq 'ARRAY' or @$completions == 0) {
                     # if not, we give it the chance to give us the full list of options
-                    $completions = $self->completion_handler($key)->(undef,undef,$key,$self->{'values'});
+                    $completions = $completion_handler->(undef,undef,$key,$self->{'values'});
                 }
-            }
-            unless (ref($completions) eq 'ARRAY') {
-                warn "unexpected completion specification for $key: $completions???";
-                next;
+                unless (ref($completions) eq 'ARRAY') {
+                    warn "unexpected completion specification for $key: $completions???";
+                    next;
+                }
             }
             my @valid_values = @$completions;
             @valid_values_shown_in_message = @valid_values;
@@ -490,7 +499,7 @@ Getopt::Complete::Args - a set of option/value pairs
 
 =head1 VERSION
 
-This document describes Getopt::Complete::Args 0.24.
+This document describes Getopt::Complete::Args 0.25.
 
 =head1 SYNOPSIS
 
