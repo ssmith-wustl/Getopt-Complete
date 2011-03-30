@@ -20,8 +20,8 @@ ok(test_completion("$path model --help foo ") == 0, 'no results for invalid argu
 ok(test_completion("$path model --help foo") == 0, 'no results for non-argument option');
 ok(test_completion("$path project list --filter name=foo") == 0, 'no results for option argument');
 ok(test_completion("$path project list --fooba") == 0, 'no results for unknown option');
-ok(test_completion("$path project list --fooba ~/") > 0, 'file completion for unknown option');
-ok(test_completion("$path project list ~/") > 0, 'file completion for bare args');
+ok(test_completion("$path project list --fooba $FindBin::Bin") > 0, 'file completion for unknown option');
+ok(test_completion("$path project list $FindBin::Bin") > 0, 'file completion for bare args');
 
 sub test_completion {
     my $COMP_LINE = shift;
