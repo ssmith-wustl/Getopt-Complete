@@ -1,5 +1,8 @@
 Revision history for Getopt-Complete
 
+0.26    ????
+        Updated test case to hopefully not fail on empty ~ smoke tester machines
+
 0.25    2011-03-28
         Fixed bug with '<>=s@' not taking multiple values.
         Fixed but with single character options.

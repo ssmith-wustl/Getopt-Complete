@@ -269,7 +269,7 @@ Getopt::Complete::Options - a command-line options specification
 
 =head1 VERSION
 
-This document describes Getopt::Complete 0.25
+This document describes Getopt::Complete 0.26
 
 =head1 SYNOPSIS
 
