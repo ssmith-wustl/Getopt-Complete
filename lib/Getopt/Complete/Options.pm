@@ -148,8 +148,8 @@ sub _init {
 
 sub handle_shell_completion {
     my $self = shift;
-    if ($ENV{COMP_LINE}) {
-        my ($command,$current,$previous,$other) = $self->parse_completion_request($ENV{COMP_LINE},$ENV{COMP_POINT});
+    if ($ENV{COMP_CWORD}) {
+        my ($command,$current,$previous,$other) = $self->parse_completion_request(\@ARGV,$ENV{COMP_CWORD});
         unless ($command) {
             # parse error
             # this typically only happens when there are mismatched quotes, which means something you can't complete anyway
@@ -169,34 +169,34 @@ sub handle_shell_completion {
     return 1;
 }
 
-sub _line_to_argv {
-    my $line = pop;
-    my $cmd = q{perl -e "use Data::Dumper; print Dumper(\@ARGV)" -- } . $line;
-    my ($reader,$writer);
+sub _expand_token {
+    my $self = shift;
+    my $token = shift;
+
+    return '' unless $token;
+
+    my ($reader, $writer);
     my $pid = open2($reader,$writer,'bash 2>/dev/null');
     return unless $pid;
-    print $writer $cmd;
+    print $writer "echo $token";
     close $writer;
     my $result = join("",<$reader>);
-    no strict; no warnings;
-    my $array = eval $result;
-    my @array = @$array;
-
-    # We don't want to expand ~ for user experience and to be consistent with
-    # Bash's behavior for tab completion (as opposed to expansion of ARGV).
-    my $home_dir = (getpwuid($<))[7];
-    @array = map { $_ =~ s/^$home_dir/\~/; $_ } @array;
-
-    return @array;
+    chomp $result;
+    return $result || $token;
 }
 
 sub parse_completion_request {
     my $self = shift;
-    my ($comp_line, $comp_point) = @_;
+    my ($comp_words, $comp_cword) = @_;
 
-    my $left = substr($comp_line,0,$comp_point);
-    my @left = _line_to_argv($left);
+    @$comp_words = map($self->_expand_token($_), @$comp_words);
 
+    my @left = @$comp_words[0..$comp_cword];
+    my $want_new_word = (!defined $left[-1]);  #if starting new word, last value will be undef
+    my $left = join(" ", map(defined($_) ? $_ : '', @left)); #want an extra space at end if $want_new_word
+    if($want_new_word) {
+        pop @left;
+    }
     # find options for last sub-command if it has a completion handler
     # skipping first command but old code didn't but it also never seemed to trigger before
     my @sub_cmds = @left[1..$#left];
@@ -205,9 +205,9 @@ sub parse_completion_request {
         $self = $delegate;
     }
 
-    my $right = substr($comp_line,$comp_point);
-    my @right = _line_to_argv($right);
-    
+    my @right = @$comp_words[($comp_cword+1)..$#$comp_words];
+    my $right = join(" ", @right);
+
     unless (@left) {
         # parse error
         return;
@@ -297,7 +297,7 @@ This is used internally by Getopt::Complete during compile.
  # if it detects it is talking to the shell completer, it will respond and then exit
 
  # this method is used by the above, then makes a Getopt::Complete::Args.
- ($text_typed,$option_name,$remainder_of_argv) = $self->parse_completion_request($comp_line,$comp_point);
+ ($text_typed,$option_name,$remainder_of_argv) = $self->parse_completion_request($comp_words,$comp_cword);
 
 =head1 DESCRIPTION
 

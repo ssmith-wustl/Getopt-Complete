@@ -16,7 +16,7 @@ sub import {
     my $file  = delete $args{file}  if exists $args{file};
     my $above = 0; $above = delete $args{above} if exists $args{above};
     my $dynamic_caching = 0; $dynamic_caching = delete $args{dynamic_caching} if exists $args{dynamic_caching};
-    my $comp_line = $ENV{COMP_LINE}; $comp_line = delete $args{comp_line} if exists $args{comp_line};
+    my $comp_cword = $ENV{COMP_CWORD}; $comp_cword = delete $args{comp_cword} if exists $args{comp_cword};
 
     if (%args) {
         require Data::Dumper;
@@ -28,7 +28,7 @@ sub import {
         die __PACKAGE__ . " received both a class and file param: $class, $file!";
     }
 
-    return unless ($comp_line);
+    return unless ($comp_cword);
 
     # doesn't detect
     my $module_path;

@@ -122,7 +122,7 @@ sub _init {
         if (!$retval and @errors == 0) {
             push @errors, "unknown error processing arguments!";
         }
-        if ($ENV{COMP_LINE}) {
+        if ($ENV{COMP_CWORD}) {
             # we want to allow unknown option if the user puts them in, we just
             # didn't help complete it
             @errors = grep { $_ !~ /^Unknown option:/ } @errors;
@@ -521,7 +521,7 @@ look like this:
     argv => \@ARGV
  );
 
- $args->options->handle_shell_completion;   # support 'complete -C myprogram myprogram'
+ $args->options->handle_shell_completion;   # support 'complete -F _getopt_complete myprogram'
 
  if (my @e = $args->errors) {
     for my $e (@e) {

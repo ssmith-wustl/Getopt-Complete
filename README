@@ -24,7 +24,10 @@ SYNOPSIS
 
     In ~/.bashrc or ~/.bash_profile, or directly in bash:
 
-      complete -C myprogram myprogram
+      function _getopt_complete () {
+        COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` ${COMP_WORDS[@]:0} ));
+      }
+      complete -F _getopt_complete myprogram
 
     Thereafter in the terminal (after next login, or sourcing the updated
     .bashrc):
@@ -147,12 +150,10 @@ HOW TO CONFIGURE PROGRAMMABLE COMPLETION
 
     2   Put the following in your .bashrc or .bash_profile:
 
-          complete -C myprogram myprogram
-
-        For the very conservative, do this (to ensure nothing runs during
-        completion checks):
-
-          complete -C 'perl -c myprogram 2>/dev/null' myprogram
+          function _getopt_complete () {
+            COMPREPLY=($( COMP_CWORD=$COMP_CWORD perl `which ${COMP_WORDS[0]}` ${COMP_WORDS[@]:0} ));
+          }
+          complete -F _getopt_complete myprogram
 
     3   New logins will automatically run the above and become aware that
         your program has programmable completion. For shells you already
