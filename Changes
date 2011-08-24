@@ -1,7 +1,9 @@
 Revision history for Getopt-Complete
 
-0.26    ????
-        Updated test case to hopefully not fail on empty ~ smoke tester machines
+0.26    2011-08-23
+        Minor rewrite to use COMP_WORDS instead of COMP_LINE to resolve bug involving redirection.
+        Include bin/getopt_complete.sh which can be sourced in Bash to load the completion function.
+        Updated test case to hopefully not fail for users with an empty home directory.
 
 0.25    2011-03-28
         Fixed bug with '<>=s@' not taking multiple values.
@@ -15,7 +17,7 @@ Revision history for Getopt-Complete
 
 0.22    2011-01-16
         Another atch from  Andrei Benea (abenea@github) fixing bug with nonsense argument not generating an error.
-        
+
 0.21    2011-01-12
         Patch from  Andrei Benea (abenea@github) fixing bug with all bare arguments.
         Fix to the demoapp test.
@@ -37,7 +39,7 @@ Revision history for Getopt-Complete
 0.15    2010-10-24
         Fixed a failing test with a bad perl interpreter path for the demoapp.
         Fixed a bug with running tests on a machine with a space in the path to the files.
-        
+
 0.14    2010-09-09
         Fixed bug that returned completion results even when various errors were encountered.
         Added t/demoapp*, a test to validate some basic tab completion results.
@@ -62,12 +64,12 @@ Revision history for Getopt-Complete
         Added OSCON lightning talk to docs.
 
 0.8     2009-07-24
-        Fixed a bug in the last release causing params to dump to the screen upon execution.  
+        Fixed a bug in the last release causing params to dump to the screen upon execution.
 
 0.7     2009-07-18
         Fixed a critical bug in the last release causing %ARGS and $ARGS to not export.
 
-0.6     2009-07-18 
+0.6     2009-07-18
         Sub-command tree support added.
 
 0.5     2009-07-18
@@ -91,6 +93,6 @@ Revision history for Getopt-Complete
         Added support for "complete -F" in addition to "complete -C".
         (The app can now examine the entire command-line, not just the option pair currently under consideration.)
 
-0.01    2008-12-19 
+0.01    2008-12-19
         First version, released on an unsuspecting world.
 
