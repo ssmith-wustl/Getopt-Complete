@@ -918,6 +918,7 @@ Copyright 2010, 2011 Washington University School of Medicine
 Scott Smith (sakoht at cpan .org)
 Nathan Nutter
 Andrei Benea
+Thomas B. Mooney
 
 =head1 LICENSE
 
