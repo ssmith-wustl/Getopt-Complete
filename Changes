@@ -1,5 +1,8 @@
 Revision history for Getopt-Complete
 
+0.27    ???
+        ???
+
 0.26    2011-08-23
         Minor rewrite to use COMP_WORDS instead of COMP_LINE to resolve bug involving redirection.
         Include bin/getopt_complete.sh which can be sourced in Bash to load the completion function.
