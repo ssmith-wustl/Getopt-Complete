@@ -1,5 +1,5 @@
 NAME
-    Getopt::Complete - programmable shell completion for Perl apps
+    Getopt::Complete - dynamic programmable shell completion
 
 VERSION
     This document describes Getopt::Complete v0.9.
